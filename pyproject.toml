@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dnd-recaps"
+version = "0.1.0"
+description = "Local session archive, audio transcription, and evidence-based D&D recaps"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+dnd-recaps = "dnd_recaps.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

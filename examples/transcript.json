@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "segments": [
+    {"id":"c0000:s0000","start":0,"end":8,"speaker":"c0000:A","text":"DM: Last session you arrived in Reedhaven. Tonight you are still at the gate."},
+    {"id":"c0000:s0001","start":9,"end":15,"speaker":"c0000:B","text":"Mira: We could steal the key. No, I ask the guard for help instead."},
+    {"id":"c0000:s0002","start":16,"end":28,"speaker":"c0000:A","text":"DM: The guard lends Mira the brass key. She says the tower is empty, but you have not checked that."},
+    {"id":"c0000:s0003","start":29,"end":38,"speaker":"c0000:B","text":"Mira: Tomorrow we should go to the tower. For now we wait here at the gate."}
+  ]
+}
