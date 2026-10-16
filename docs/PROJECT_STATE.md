@@ -10,11 +10,21 @@ with validated source-ID coverage before campaign evidence notes reach the story
 Unrelated chatter is omitted; ambiguous topics are withheld and retained outside
 recursive reduction in backend-specific `manual-check.draft.md`/`.json` files.
 The session's `manual-check.md` index and `review.md` remain human-owned decision
-logs. All 67 offline tests pass, including multi-batch preservation, withheld-ID
+logs. All 72 offline tests pass, including multi-batch preservation, withheld-ID
 checks, incomplete/malformed responses, cache invalidation, and backend isolation.
 No paid calls or real-audio processing occurred during this change. See the
 [implementation checklist](MANUAL_CHECK_PLAN.md) and
 [review workflow](workflow.md#campaign-relevance-and-manual-checks).
+
+The user's older summary process subsequently failed citation validation. Read-only
+cache diagnostics found compressed citation ranges and nonexistent IDs in some
+intermediate notes. Exact individual citations are now required at every narrative
+stage, including when another valid citation is present. A single cached rewrite
+from the same validated evidence is attempted on citation failure, then failure
+stops publication. No guessed range expansion or ID substitution is performed.
+Transcription and diarization caches remain intact; rerun only summarize below.
+See [citation recovery checklist](CITATION_RECOVERY_PLAN.md). No live API calls
+were made to validate the repair.
 
 The user confirms first-recording GPU ASR completed all 13 chunks in about 323
 seconds and full-recording diarization subsequently completed. Embeddings took

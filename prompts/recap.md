@@ -39,6 +39,10 @@ the secret. Every output is an unreviewed draft, not automatically spoiler-safe.
 Cite significant events with the exact provided [cNNNN:sNNNN] segment IDs. When
 merging notes preserve those citations. Do not create new IDs. Give combat outcomes
 and lasting effects rather than every roll. Include social and exploration scenes.
+Each ID needs its own square brackets: [c0000:s0001] [c0000:s0004]. These are format
+examples only; copy actual IDs from the supplied evidence. Never compress IDs into
+ranges, abbreviate chunk/segment prefixes, put multiple IDs in one bracket pair,
+or use bare IDs. Never guess a nearby ID when the needed evidence is absent.
 For absent evidence say "Not established" rather than filling gaps.
 Overlapping chunks can repeat the same dialogue: narrate that event once while
 preserving its evidence references. Do not mistake repeated audio for repeated actions.

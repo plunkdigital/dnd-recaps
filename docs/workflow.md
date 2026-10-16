@@ -134,6 +134,13 @@ If any batch flags a repeated source ID as uncertain or unrelated, campaign note
 using it are withheld conservatively. Intermediate and final citations must refer
 only to retained campaign evidence. Malformed extraction, missing/duplicate/unknown
 IDs, incomplete provider output, and invalid narrative citations stop publication.
+Invalid narrative citations get at most one cached regeneration from the same
+validated evidence before stopping. The invalid draft is not fed back as evidence.
+Each ID must have its own brackets; ranges, shorthand, bare references, and grouped
+IDs are rejected even when the same response contains a valid citation. No range
+expansion, guessed ID replacement, or validation bypass is performed. Recovery is
+an additional paid text request when its response is not already cached; network
+errors and incomplete provider responses do not trigger this recovery path.
 All-unrelated or all-uncertain inputs produce a short no-established-events draft
 and the completed review report rather than an invented story. A valid ID does not
 prove factual support, nor can code ensure every off-topic remark was detected.

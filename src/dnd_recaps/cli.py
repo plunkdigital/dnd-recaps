@@ -304,7 +304,7 @@ def summarize(root, dest, model, backend="openai"):
         instructions += "\nAcoustic labels are session-local and may be wrong. Unknown labels mark uncertain/overlapping speech. They are not player or character identities; use explicit reviewed mappings only."
         instructions += "\nOnly the active reviewed speaker_map applies. speaker_map_history records superseded corrections, not additional identities. Voice-match proposals are not approved identity evidence."
     cache = summary_dir / "cache"
-    from .relevance import (EXTRACTION_TASK, citations, parse_extraction, publish_checks,
+    from .relevance import (EXTRACTION_TASK, generate_cited, parse_extraction, publish_checks,
                             render_checks, select_evidence, source_batches)
     items = []
     extraction_batches = source_batches(transcript["segments"], render)
@@ -334,10 +334,8 @@ def summarize(root, dest, model, backend="openai"):
                 "do not write a final recap yet.")
         outputs = []
         for note in notes:
-            output = generate(instructions + task, note, model, cache)
-            cited = citations(output)
-            if not cited or not cited <= citations(note) or not cited <= allowed:
-                raise ValueError("Recap/notes lack valid campaign source IDs or include withheld IDs. Inspect cached output.")
+            stage = "final recap" if final else f"note reduction level {level + 1}"
+            output = generate_cited(instructions + task, note, model, cache, stage)
             outputs.append(output)
         if final:
             recap = outputs[0]

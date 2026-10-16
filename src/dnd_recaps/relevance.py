@@ -32,6 +32,38 @@ def citations(text):
     return set(re.findall(r"\[(c\d+:s\d+)\]", text))
 
 
+def valid_citations(text, allowed):
+    matches = list(re.finditer(r"\[(c\d+:s\d+)\]", text))
+    if not matches or not {match[1] for match in matches} <= allowed:
+        return False
+    # Do not let one valid reference conceal compressed, bare, or invented IDs.
+    remaining = re.sub(r"\[c\d+:s\d+\]", "", text)
+    return re.search(r"\bc\d+\s*:\s*s\d+\b|\[\s*s\d+\b", remaining) is None
+
+
+def generate_cited(instructions, source, model, cache, stage):
+    from .cli import generate
+
+    allowed = citations(source)
+    output = generate(instructions, source, model, cache)
+    if valid_citations(output, allowed):
+        return output
+    print(f"Citation validation failed during {stage}; regenerating once from supplied evidence.", flush=True)
+    # The invalid draft is deliberately not used as evidence or fed back into the
+    # rewrite. Reconstruct from the same validated input; never guess replacements.
+    repair = ("\nCitation recovery attempt 1. The previous response failed citation validation. "
+              "Rewrite from the supplied source evidence only. Cite significant claims with exact individual "
+              "[cNNNN:sNNNN] IDs copied from the source. Never use ranges, shorthand, bare IDs, "
+              "comma-separated IDs inside one bracket pair, or invented IDs. "
+              "If evidence cannot support a claim, omit it. Do not substitute a nearby ID. "
+              "The permitted IDs are: " + json.dumps(sorted(allowed)))
+    output = generate(instructions + repair, source, model, cache)
+    if not valid_citations(output, allowed):
+        raise ValueError(f"Citation validation failed during {stage}, including one recovery attempt. "
+                         "No new recap/review pair published. Original responses and completed audio stages remain cached.")
+    return output
+
+
 def source_batches(segments, render, limit=8000):
     from .cli import batches
 
