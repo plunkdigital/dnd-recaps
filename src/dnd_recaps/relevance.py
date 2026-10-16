@@ -110,6 +110,69 @@ def parse_extraction(text, expected):
     return items
 
 
+def recover_omitted_sources(text, expected):
+    """Withhold anything unclassified or invalid; never guess campaign relevance."""
+    try:
+        return parse_extraction(text, expected)
+    except ValueError:
+        pass
+    # Only independently valid items are candidates. Unknown IDs, malformed
+    # fields and internal duplicates invalidate the whole item, not just its IDs.
+    candidates = []
+    issues = set()
+    invalid_sources = set()
+    try:
+        data = json.loads(text)
+        if not isinstance(data["items"], list):
+            raise ValueError
+        for item in data["items"]:
+            raw_ids = item.get("source_ids", []) if isinstance(item, dict) else []
+            item_sources = ({source for source in raw_ids if isinstance(source, str) and source in expected}
+                            if isinstance(raw_ids, list) else set())
+            try:
+                declared = set(item["source_ids"])
+                if not declared <= expected:
+                    raise ValueError
+                candidates.extend(parse_extraction(json.dumps({"items": [item]}), declared))
+            except (ValueError, KeyError, TypeError):
+                issues.add("invalid_item")
+                invalid_sources.update(item_sources)
+    except (ValueError, KeyError, TypeError):
+        issues.add("invalid_response")
+    counts = {}
+    for item in candidates:
+        for source in item["source_ids"]:
+            counts[source] = counts.get(source, 0) + 1
+    disputed = {source for source, count in counts.items() if count > 1}
+    if disputed:
+        issues.add("conflicting_groups")
+    # Do not pick a winning classification or rewrite group evidence. Remove
+    # every group touching a disputed source, withholding the entire group.
+    blocked = disputed | invalid_sources
+    items = [item for item in candidates if not blocked.intersection(item["source_ids"])]
+    declared = {source for item in items for source in item["source_ids"]}
+    missing = sorted(expected - declared)
+    if not missing:
+        # An invalid item with no usable source pointers cannot be located safely.
+        # Withhold the batch rather than attach invented IDs or pick valid-looking
+        # material from a response whose conflict cannot be attributed.
+        items = []
+        missing = sorted(expected)
+        issues.add("unattributable_invalid_item")
+    items.append({
+        "source_ids": missing, "category": "uncertain", "reason": "unclassified_sources",
+        "topic": "Unclassified recording segments",
+        "question": "These segments lack a valid, nonconflicting classification. Are they campaign-related? "
+                    "Review each source span; they may concern different topics. Withheld pending review.",
+        "classification_issues": sorted(issues or {"omitted_sources"}),
+    })
+    # The augmented result must satisfy exactly the same complete-coverage check.
+    result = parse_extraction(json.dumps({"items": items}), expected)
+    print(f"Relevance extraction left {len(missing)} source IDs unclassified or invalid; "
+          "withheld and added to manual checks.", flush=True)
+    return result
+
+
 def select_evidence(items):
     # A segment repeated across a text-batch boundary is withheld if ANY batch
     # finds its relevance uncertain. Keep questions out of narrative reduction.
@@ -124,6 +187,10 @@ def select_evidence(items):
             allowed.update(ids)
         elif item["category"] == "uncertain":
             key = tuple(" ".join(item[field].casefold().split()) for field in ("topic", "question"))
+            if item.get("reason") == "unclassified_sources":
+                # Unclassified spans may concern unrelated topics. Keep each
+                # extraction batch's omission group separate and manageable.
+                key += (tuple(sorted(ids)),)
             if key not in seen:
                 seen[key] = len(checks)
                 checks.append({**item, "source_ids": list(ids)})
@@ -139,13 +206,20 @@ def cell(text):
 
 def render_checks(checks, segments, backend, transcript_hash):
     by_id = {segment["id"]: segment for segment in segments}
-    lines = ["# Manual campaign relevance checks", "",
-             "Extraction: complete for all transcript batches. Human review: pending.",
+    unclassified = {source for check in checks if check.get("reason") == "unclassified_sources"
+                    for source in check["source_ids"]}
+    status = ("Extraction coverage: complete, including withheld unclassified spans. "
+              "Model classification: partial or invalid. Human review: pending." if unclassified else
+              "Extraction: complete for all transcript batches. Human review: pending.")
+    lines = ["# Manual campaign relevance checks", "", status,
              "This is model-generated selection, not a guarantee that every ambiguity was detected.",
              f"Transcript backend: `{backend}`. Transcript SHA-256: `{transcript_hash}`.", "",
              "Ambiguous material was withheld from the draft. Check the source audio before deciding.",
              "Record decisions and reviewer/date in the session's manual-check.md or review.md;",
              "this generated draft is replaced on rerun. Do not edit it to retain decisions.", ""]
+    if unclassified:
+        lines += [f"Model classification left {len(unclassified)} distinct source segments "
+                  "unclassified or invalid. These were withheld and require manual review.", ""]
     if not checks:
         lines.append("No ambiguous campaign-relevance topics were identified in this complete extraction.")
     else:

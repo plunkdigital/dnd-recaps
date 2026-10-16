@@ -304,7 +304,7 @@ def summarize(root, dest, model, backend="openai"):
         instructions += "\nAcoustic labels are session-local and may be wrong. Unknown labels mark uncertain/overlapping speech. They are not player or character identities; use explicit reviewed mappings only."
         instructions += "\nOnly the active reviewed speaker_map applies. speaker_map_history records superseded corrections, not additional identities. Voice-match proposals are not approved identity evidence."
     cache = summary_dir / "cache"
-    from .relevance import (EXTRACTION_TASK, generate_cited, parse_extraction, publish_checks,
+    from .relevance import (EXTRACTION_TASK, generate_cited, recover_omitted_sources, publish_checks,
                             render_checks, select_evidence, source_batches)
     items = []
     extraction_batches = source_batches(transcript["segments"], render)
@@ -312,7 +312,7 @@ def summarize(root, dest, model, backend="openai"):
         print(f"Campaign relevance review: batch {index}/{len(extraction_batches)}", flush=True)
         task = EXTRACTION_TASK + "\nRequired source IDs for this batch: " + json.dumps(sorted(expected))
         output = generate(instructions + task, batch, model, cache)
-        items.extend(parse_extraction(output, expected))
+        items.extend(recover_omitted_sources(output, expected))
     selected, allowed, checks = select_evidence(items)
     notes = batches(selected)
     instructions += "\nRecap input SHA-256: " + hashlib.sha256(text.encode()).hexdigest()
@@ -345,11 +345,15 @@ def summarize(root, dest, model, backend="openai"):
         raise ValueError("Summary reduction did not converge; cached intermediate responses are retained.")
     transcript_hash = digest(transcript_path)
     report = render_checks(checks, transcript["segments"], backend, transcript_hash)
+    unclassified = {source for item in items if item.get("reason") == "unclassified_sources"
+                    for source in item["source_ids"]}
     report_hash = publish_checks(dest, summary_dir, report, {
         "schema_version": 1, "extraction_status": "complete", "human_review_status": "pending",
         "transcription_backend": backend, "transcript_sha256": transcript_hash,
         "extraction_batches": len(extraction_batches), "checks": checks,
         "campaign_source_ids": sorted(allowed),
+        "unclassified_source_ids": sorted(unclassified),
+        "classification_status": "partial" if unclassified else "complete",
     })
     write(summary_dir / "recap.draft.md", "<!-- UNREVIEWED: verify facts and audience before sharing. -->\n\n" + recap + "\n")
     save_json(summary_dir / "provenance.json", {
@@ -362,6 +366,8 @@ def summarize(root, dest, model, backend="openai"):
         "context_policy": policy, "context_files": list(names),
         "relevance_extraction_version": 1, "extraction_batches": len(extraction_batches),
         "manual_check_sha256": report_hash, "manual_check_count": len(checks),
+        "unclassified_source_count": len(unclassified),
+        "relevance_classification_status": "partial" if unclassified else "complete",
         "recap_sha256": digest(summary_dir / "recap.draft.md"),
     })
     print(f"Created {summary_dir.relative_to(dest)}/recap.draft.md and manual-check.draft.md. "

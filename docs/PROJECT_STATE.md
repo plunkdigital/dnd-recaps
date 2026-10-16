@@ -5,16 +5,40 @@ belongs in `context/campaign/state.md`; keep those two kinds of state separate.
 
 ## Current phase
 
+The user reports summarization is progressing and requested an overnight run from
+Session 2 onward. `scripts/generate_recaps_remaining_gpu.sh --allow-cloud` now runs
+sessions 2–6, continues after individual session failures, and logs stage outcomes
+under ignored `recordings/catalog/batch-runs/`. The main runner also accepts
+`--from-session 1-6` and `--continue-on-error`; its defaults remain start at 1 and
+stop on failure. All 85 offline tests and shell syntax checks pass, including
+stub-only batch order, cloud authorization, logs, preflight and failure handling.
+No overnight job or provider call was started by the agent. See
+[overnight checklist](OVERNIGHT_BATCH_PLAN.md) and
+[run instructions](local-diarization.md#overnight-sessions-2-6).
+
 Automatic relevance review is implemented. Every transcript batch is classified
 with validated source-ID coverage before campaign evidence notes reach the story.
 Unrelated chatter is omitted; ambiguous topics are withheld and retained outside
 recursive reduction in backend-specific `manual-check.draft.md`/`.json` files.
 The session's `manual-check.md` index and `review.md` remain human-owned decision
-logs. All 72 offline tests pass, including multi-batch preservation, withheld-ID
+logs. All 80 offline tests pass, including multi-batch preservation, withheld-ID
 checks, incomplete/malformed responses, cache invalidation, and backend isolation.
 No paid calls or real-audio processing occurred during this change. See the
 [implementation checklist](MANUAL_CHECK_PLAN.md) and
 [review workflow](workflow.md#campaign-relevance-and-manual-checks).
+
+Latest failure: batch 4 contained a source assigned to conflicting groups. Relevance
+recovery now retains only independently validated, nonconflicting groups; omissions
+and all sources touched by invalid/conflicting groups are withheld for manual review.
+An unparseable response withholds the whole batch. Strict parsing still rejects
+bad evidence; only a fully validated augmented result enters narrative selection.
+Provider-incomplete responses and network failures still stop the run. Reports
+explicitly disclose partial/invalid model classification. Replayed the four actual
+cached batches offline: complete source coverage in all four, with 15/0/18/15 sources
+flagged for review respectively. Batch 4 retains 41 campaign source IDs. Raw caches
+are unchanged and no provider calls occurred. Retry the same summary command below;
+no GPU stages need repeating. See
+[coverage recovery checklist](RELEVANCE_RECOVERY_PLAN.md).
 
 The user's older summary process subsequently failed citation validation. Read-only
 cache diagnostics found compressed citation ranges and nonexistent IDs in some
@@ -108,6 +132,16 @@ See [DM and inbox checklist](DM_AND_INBOX_PLAN.md) and
   preparation was regenerated and verified. Remaining cloud checks are outstanding.
 
 ## Immediate next step and remaining setup
+
+For the user's authorized remaining batch, run:
+
+```bash
+./scripts/generate_recaps_remaining_gpu.sh --allow-cloud
+```
+
+Keep the computer awake; use the linked nohup command if closing the terminal.
+This skips Session 1 and can run alongside its separate summary. Check the printed
+run log and status.tsv for failures and review manual-check.md files in the morning.
 
 The user's first diarization has completed. Let any active summary writer finish.
 Later summary processes in the existing batch automatically use the new relevance

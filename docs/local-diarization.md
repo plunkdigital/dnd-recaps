@@ -33,6 +33,52 @@ these credential-dependent operations in this runtime.
 
 ## Speaker turns and text
 
+### Overnight sessions 2-6
+
+Run from this repository with the existing GPU/model/credential setup:
+
+```bash
+./scripts/generate_recaps_remaining_gpu.sh --allow-cloud
+```
+
+This skips Session 1 and runs sessions 2–6 in the confirmed order, one stage and
+recording at a time. Each gets local GPU ASR, local diarization, and paid OpenAI
+text relevance review/recaps. The wrapper uses the existing batch with
+`--from-session 2 --continue-on-error`. Completed caches are reused; interrupted
+diarization still needs to restart that full recording. Do not rerun transcription
+over manual transcript corrections without preserving them first.
+
+If a session stage fails, later stages for that session are skipped and the next
+session starts. Shared GPU/model preflight failures stop the whole batch. There
+are no automatic network retries. The batch returns exit code 1 if any session
+fails, even if later sessions complete. The printed run directory under ignored
+`recordings/catalog/batch-runs/` contains `run.log` and `status.tsv` with each
+attempted session/stage's exit code. Review those files and each successful session's
+`manual-check.md` afterwards; failed sessions do not count as completed recaps.
+
+To keep running after closing the terminal, optionally launch with `nohup`:
+
+```bash
+nohup ./scripts/generate_recaps_remaining_gpu.sh --allow-cloud > /tmp/dnd-recaps-overnight.log 2>&1 < /dev/null &
+```
+
+`/tmp/dnd-recaps-overnight.log` records console output, including the durable run
+directory. Leave the computer awake and WSL running overnight. Do not launch two
+batches for the same sessions. This wrapper may run while Session 1 finishes its
+separate summary, since it never writes Session 1. No job was launched by the agent.
+
+To start later, for example at Session 4, reuse the main runner:
+
+```bash
+./scripts/generate_recaps_gpu.sh --allow-cloud --from-session 4 --continue-on-error
+```
+
+For a summary-only failure, rerun that session's `summarize` command rather than
+repeat audio stages. No human review decisions or campaign state are applied by
+the batch. Without these options the original runner still starts at Session 1
+and stops at the first session failure. Offline stub-command tests cover these
+paths; actual overnight completion and live-provider reliability are unverified.
+
 ### Embedding performance
 
 The cached Community-1 configuration already uses embedding batch size 32. Our

@@ -132,8 +132,26 @@ model arithmetic. Repeated identical questions combine source references.
 Questions are stored outside recursive note reduction and do not enter story inputs.
 If any batch flags a repeated source ID as uncertain or unrelated, campaign notes
 using it are withheld conservatively. Intermediate and final citations must refer
-only to retained campaign evidence. Malformed extraction, missing/duplicate/unknown
-IDs, incomplete provider output, and invalid narrative citations stop publication.
+only to retained campaign evidence. If an otherwise valid classification omits
+source IDs, the code marks those IDs uncertain with reason `unclassified_sources`,
+withholds them, and adds a manual question for each affected batch. It never guesses
+their relevance or silently treats them as unrelated. The augmented result still
+must pass complete source-ID coverage validation. The report lists the omitted
+segment count and explicitly marks model classification partial; JSON and provenance
+record this status and the unclassified count/IDs. Cached omissions are handled
+without regenerating the request. A completely empty classification withholds the
+whole batch. Independently validated groups can be retained when other groups
+contain malformed fields, duplicate or unknown IDs. Every group touching a source
+that is disputed or referenced by an invalid group is withheld in full; no winner
+is selected. Invalid JSON or an unusable response structure withholds the entire
+batch. An invalid extra item without usable source pointers also withholds the
+whole batch if its conflict cannot otherwise be located. These cases are flagged
+with `classification_issues` in the generated review JSON, not treated as valid
+campaign evidence. All returned/augmented items still pass strict source-ID coverage
+validation before use. Reports explicitly disclose partial or invalid model
+classification. No additional request is made just to repair relevance classification.
+Incomplete provider responses, network failures, and invalid narrative citations
+still stop publication.
 Invalid narrative citations get at most one cached regeneration from the same
 validated evidence before stopping. The invalid draft is not fed back as evidence.
 Each ID must have its own brackets; ranges, shorthand, bare references, and grouped

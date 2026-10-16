@@ -74,18 +74,21 @@ class RelevanceTests(unittest.TestCase):
             with self.subTest(variant=variant), self.assertRaises(ValueError):
                 relevance.parse_extraction(variant, expected)
 
-    def test_malformed_extraction_preserves_previous_outputs_and_human_decisions(self):
+    def test_malformed_extraction_withholds_batch_and_preserves_human_decisions(self):
         self.run_summary()
-        paths = [self.dest / "summaries" / name for name in
-                 ("recap.draft.md", "manual-check.draft.md", "provenance.json")]
-        before = [p.read_bytes() for p in paths]
+        reviewed = self.dest / "summaries/recap.reviewed.md"
+        reviewed.write_text("Human reviewed recap")
+        caches = {p: p.read_bytes() for p in (self.dest / "summaries/cache").glob("*.json")}
         index = self.dest / "manual-check.md"
         index.write_text("Human reviewed: exclude. Reviewer/date retained.\n")
         self.segments[0]["text"] = "Changed evidence invalidates extraction request."
         cli.save_json(self.dest / "transcripts/transcript.json", {"segments": self.segments})
-        with self.assertRaises(ValueError):
-            self.run_summary(lambda *args: response('{"items": []}'))
-        self.assertEqual(before, [p.read_bytes() for p in paths])
+        api = self.run_summary(lambda *args: response('{"items": null}'))
+        self.assertEqual(api.call_count, 1)
+        self.assertIn("No campaign events were established", (self.dest / "summaries/recap.draft.md").read_text())
+        self.assertIn("3 distinct source segments", (self.dest / "summaries/manual-check.draft.md").read_text())
+        self.assertTrue(all(p.read_bytes() == value for p, value in caches.items()))
+        self.assertEqual(reviewed.read_text(), "Human reviewed recap")
         self.assertIn("Reviewer/date retained", index.read_text())
 
     def test_final_reintroduction_of_withheld_source_fails(self):
@@ -186,6 +189,96 @@ class RelevanceTests(unittest.TestCase):
         self.assertEqual(calls, 2)
         self.assertFalse((self.dest / "manual-check.md").exists())
         self.assertFalse((self.dest / "summaries/manual-check.draft.md").exists())
+
+    def test_missing_classifications_are_withheld_and_reported_on_cached_rerun(self):
+        self.items = self.items[:1]
+        api = self.run_summary()
+        self.assertEqual(api.call_count, 2)
+        narrative = json.loads(api.call_args_list[-1].args[1])["input"]
+        self.assertNotIn("UNRELATED_CHATTER", narrative)
+        self.assertNotIn("AMBIGUOUS_SOURCE_TOPIC", narrative)
+        report = (self.dest / "summaries/manual-check.draft.md").read_text()
+        self.assertIn("2 distinct source segments", report)
+        self.assertIn("Model classification: partial", report)
+        self.assertIn("[c0000:s0001]", report)
+        self.assertIn("[c0000:s0002]", report)
+        details = cli.read_json(self.dest / "summaries/manual-check.draft.json")
+        self.assertEqual(details["unclassified_source_ids"], ["c0000:s0001", "c0000:s0002"])
+        self.assertEqual(details["classification_status"], "partial")
+        provenance = cli.read_json(self.dest / "summaries/provenance.json")
+        self.assertEqual(provenance["unclassified_source_count"], 2)
+        self.run_summary().assert_not_called()
+
+    def test_empty_classification_withholds_entire_batch_instead_of_inventing_events(self):
+        self.items = []
+        api = self.run_summary()
+        self.assertEqual(api.call_count, 1)
+        self.assertIn("No campaign events were established", (self.dest / "summaries/recap.draft.md").read_text())
+        self.assertIn("3 distinct source segments", (self.dest / "summaries/manual-check.draft.md").read_text())
+
+    def test_coverage_recovery_withholds_all_invalid_schema_or_identity_data(self):
+        expected = {s["id"] for s in self.segments}
+        variants = ["not JSON", '{"items":null}',
+                    json.dumps({"items": [self.items[0], self.items[0]]}),
+                    json.dumps({"items": [{**self.items[0], "source_ids": ["c9999:s9999"]}]}),
+                    json.dumps({"items": [{**self.items[0], "note": None}]}),
+                    json.dumps({"items": [{**self.items[0], "note": "Unsupported [c9999:s9999]"}]})]
+        for variant in variants:
+            with self.subTest(variant=variant), contextlib.redirect_stdout(io.StringIO()):
+                recovered = relevance.recover_omitted_sources(variant, expected)
+                relevance.parse_extraction(json.dumps({"items": recovered}), expected)
+                notes, allowed, checks = relevance.select_evidence(recovered)
+                self.assertEqual(notes, "")
+                self.assertEqual(allowed, set())
+                self.assertEqual({i for c in checks for i in c["source_ids"]}, expected)
+
+    def test_conflicting_groups_are_both_removed_without_discarding_independent_evidence(self):
+        expected = {s["id"] for s in self.segments}
+        items = [self.items[0], self.items[1], {**self.items[2], "source_ids": ["c0000:s0001", "c0000:s0002"]}]
+        with contextlib.redirect_stdout(io.StringIO()):
+            recovered = relevance.recover_omitted_sources(json.dumps({"items": items}), expected)
+        notes, allowed, checks = relevance.select_evidence(recovered)
+        self.assertEqual(allowed, {"c0000:s0000"})
+        self.assertIn("party opened", notes)
+        self.assertEqual({i for c in checks for i in c["source_ids"]}, expected - allowed)
+        self.assertIn("conflicting_groups", checks[0]["classification_issues"])
+
+    def test_valid_item_is_retained_while_malformed_group_is_withheld(self):
+        expected = {s["id"] for s in self.segments}
+        items = [self.items[0], {"source_ids": ["c0000:s0001"], "category": "campaign", "note": None}]
+        with contextlib.redirect_stdout(io.StringIO()):
+            recovered = relevance.recover_omitted_sources(json.dumps({"items": items}), expected)
+        _, allowed, checks = relevance.select_evidence(recovered)
+        self.assertEqual(allowed, {"c0000:s0000"})
+        self.assertEqual({i for c in checks for i in c["source_ids"]}, expected - allowed)
+
+    def test_malformed_group_also_invalidates_overlapping_valid_group(self):
+        items = [self.items[0], {**self.items[0], "note": None}]
+        expected = {s["id"] for s in self.segments}
+        with contextlib.redirect_stdout(io.StringIO()):
+            recovered = relevance.recover_omitted_sources(json.dumps({"items": items}), expected)
+        _, allowed, checks = relevance.select_evidence(recovered)
+        self.assertEqual(allowed, set())
+        self.assertEqual({i for c in checks for i in c["source_ids"]}, expected)
+
+    def test_unattributable_invalid_group_withholds_batch_even_with_complete_valid_group(self):
+        expected = {s["id"] for s in self.segments}
+        items = [{"source_ids": sorted(expected), "category": "campaign", "note": "Evidence"},
+                 {"source_ids": ["c9999:s9999"], "category": "campaign", "note": "Untrusted claim"}]
+        with contextlib.redirect_stdout(io.StringIO()):
+            recovered = relevance.recover_omitted_sources(json.dumps({"items": items}), expected)
+        notes, allowed, checks = relevance.select_evidence(recovered)
+        self.assertEqual(notes, "")
+        self.assertEqual(allowed, set())
+        self.assertIn("unattributable_invalid_item", checks[0]["classification_issues"])
+
+    def test_unclassified_omissions_from_different_batches_remain_separate_questions(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            first = relevance.recover_omitted_sources('{"items":[]}', {"c0000:s0000"})
+            second = relevance.recover_omitted_sources('{"items":[]}', {"c0000:s0001"})
+        _, allowed, checks = relevance.select_evidence(first + second)
+        self.assertEqual(allowed, set())
+        self.assertEqual(len(checks), 2)
 
 
 if __name__ == "__main__":

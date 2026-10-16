@@ -10,6 +10,10 @@ uses your GPU for local transcription; OpenAI transcription cannot use your loca
 The GPU batch also supports [local diarization and cross-session voice proposals](docs/local-diarization.md).
 Accept the model's access conditions and add `HF_TOKEN` to your local `.env` first.
 Speaker-name suggestions require review; model downloads do not upload session audio.
+For the remaining five recordings, run
+`./scripts/generate_recaps_remaining_gpu.sh --allow-cloud`. It starts at session 2,
+continues to later sessions after a failure, and saves logs/status under ignored
+`recordings/catalog/batch-runs/`. See [overnight operation](docs/local-diarization.md#overnight-sessions-2-6).
 There is no web upload service or background watcher: receiving audio means placing
 a file in `recordings/inbox/` and running `prepare`.
 
