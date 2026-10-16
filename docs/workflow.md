@@ -52,11 +52,17 @@ This includes the separately authorized, spoiler-labelled tracked DM reference.
 The reference is stored for explicit DM-reference work only; it is not background
 context for player recap generation or media chronology.
 Metadata and context have a combined 24,000-character cap, accommodating the supplied
-Sessions 1–3 character history without truncation. Transcript batches are
-capped at 24,000 characters, with an explicit error for an oversized single line.
-No input is silently truncated. Multi-batch extraction preserves evidence IDs,
-then notes are recursively reduced into a final recap. A convergence cap stops
-runaway reduction. Provider responses must be completed and contain text.
+Sessions 1–3 character history without truncation. Relevance extraction uses
+transcript batches capped at 8,000 characters; subsequent campaign-note reduction
+uses 24,000-character batches. An oversized single line raises an explicit error.
+No input is silently truncated. Every distinct source ID in each extraction batch
+must be accounted for exactly once as campaign, unrelated, or uncertain in validated
+JSON text. Model response-format parameters are unchanged. Only campaign evidence
+notes enter recursive reduction and the final story; questions remain in a separate
+collection. A convergence cap stops runaway reduction. Provider responses must be
+completed and contain text. Classification is model judgment, not a semantic
+guarantee; human review remains necessary. This extra selection pass adds cached,
+paid text requests, including for transcripts that fit a single batch.
 
 The user is a player. Public campaign premise and user-supplied prior-session history
 can establish context, not unseen adventure events or DM secrets. The supplied
@@ -114,9 +120,42 @@ or unresolved. Record accepted corrections and evidence in the session's `review
 only resolved, supported campaign material may enter a revised recap. Keep unresolved
 items out of the tale and preserve their questions for later review.
 
-This is the required review deliverable for agent-assisted recap work. The current
-CLI does not automatically create a separate `manual-check.md`; automated extraction
-and file output still need implementation before claiming unattended compliance.
+`summarize` now creates the session's `manual-check.md` as a human-owned index and
+decision log, with links to backend-specific reports. It never overwrites an existing
+index. Generated reports live next to that backend's recap as
+`manual-check.draft.md` and `manual-check.draft.json`; those drafts are replaced on
+rerun, so keep your decisions in the session index or `review.md`. Only use the
+report link for a backend you have actually run; absent reports are not completed
+reviews. Source timestamps in Markdown come directly from the transcript, not
+model arithmetic. Repeated identical questions combine source references.
+
+Questions are stored outside recursive note reduction and do not enter story inputs.
+If any batch flags a repeated source ID as uncertain or unrelated, campaign notes
+using it are withheld conservatively. Intermediate and final citations must refer
+only to retained campaign evidence. Malformed extraction, missing/duplicate/unknown
+IDs, incomplete provider output, and invalid narrative citations stop publication.
+All-unrelated or all-uncertain inputs produce a short no-established-events draft
+and the completed review report rather than an invented story. A valid ID does not
+prove factual support, nor can code ensure every off-topic remark was detected.
+
+Provenance is written last, recording extraction version, report count/hash, recap
+hash, and transcript hash. A failed provider/validation run leaves previous successful
+outputs in place; compare provenance and exit status before treating files as current.
+The review document states extraction complete and human review pending only after
+all batches and narrative validation succeed. Human decisions are not automatically
+applied to evidence or campaign state.
+
+The new prompt/stage instructions invalidate old summary requests while preserving
+ASR and diarization caches. Identical reruns reuse new extraction and narrative
+requests. If the batch had already entered `summarize` before this change, let it
+finish and then rerun only that session's summary after it has no active writer:
+
+```bash
+./scripts/gpu_python.sh -m dnd_recaps summarize session-001-spice-bag --transcript-backend cuda-diarized --allow-cloud
+```
+
+Subsequent summary processes in the existing shell batch pick up the new workflow.
+No GPU transcription or diarization needs repeating to generate these review files.
 
 ### Evidence and approval
 

@@ -8,6 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from dnd_recaps import cli
+from summary_fixtures import summary_reply
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -79,23 +80,23 @@ class PipelineTests(unittest.TestCase):
         (self.root / "context/dm/secret.md").write_text("SECRET_SENTINEL", encoding="utf-8")
         (self.root / "context/dm/SPOILERS-rime-of-the-frostmaiden.md").write_text(
             "TRACKED_DM_REFERENCE_SENTINEL", encoding="utf-8")
-        output = response("# Session recap\nMira accepted the key. [c0000:s0002]")
-        with patch.object(cli, "api", return_value=output) as api, contextlib.redirect_stdout(io.StringIO()):
+        output = summary_reply("# Session recap\nMira accepted the key. [c0000:s0002]")
+        with patch.object(cli, "api", side_effect=output) as api, contextlib.redirect_stdout(io.StringIO()):
             cli.summarize(self.root, self.dest, "test-model")
             cli.summarize(self.root, self.dest, "test-model")
-            self.assertEqual(api.call_count, 1)
+            self.assertEqual(api.call_count, 2)
             payload = json.loads(api.call_args.args[1])
             self.assertNotIn("SECRET_SENTINEL", json.dumps(payload))
             self.assertNotIn("TRACKED_DM_REFERENCE_SENTINEL", json.dumps(payload))
             self.assertFalse(payload["store"])
             (self.root / "context/campaign/state.md").write_text("Updated reviewed state", encoding="utf-8")
             cli.summarize(self.root, self.dest, "test-model")
-            self.assertEqual(api.call_count, 2)
+            self.assertEqual(api.call_count, 4)
             transcript = cli.read_json(self.dest / "transcripts/transcript.json")
             transcript["segments"][0]["text"] = "Human correction"
             cli.save_json(self.dest / "transcripts/transcript.json", transcript)
             cli.summarize(self.root, self.dest, "test-model")
-            self.assertEqual(api.call_count, 3)
+            self.assertEqual(api.call_count, 6)
 
     def test_incomplete_output_never_publishes_recap(self):
         self.seed_transcript()
@@ -110,8 +111,8 @@ class PipelineTests(unittest.TestCase):
         cli.save_json(self.dest / "session.json", metadata)
         for name in ("characters.md", "glossary.md", "state.md"):
             (self.root / "context/campaign" / name).write_text("LATER_SESSION_SENTINEL", encoding="utf-8")
-        output = response("The guard offered a key. [c0000:s0002]")
-        with patch.object(cli, "api", return_value=output) as api, contextlib.redirect_stdout(io.StringIO()):
+        output = summary_reply("The guard offered a key. [c0000:s0002]")
+        with patch.object(cli, "api", side_effect=output) as api, contextlib.redirect_stdout(io.StringIO()):
             cli.summarize(self.root, self.dest, "test-model")
         self.assertNotIn("LATER_SESSION_SENTINEL", api.call_args.args[1].decode())
         provenance = cli.read_json(self.dest / "summaries/provenance.json")
@@ -155,7 +156,7 @@ class PipelineTests(unittest.TestCase):
 
     def test_unknown_citation_never_publishes_recap(self):
         self.seed_transcript()
-        with patch.object(cli, "api", return_value=response("Invented [c9999:s9999]")), self.assertRaises(ValueError):
+        with patch.object(cli, "api", side_effect=summary_reply("Invented [c9999:s9999]")), self.assertRaises(ValueError):
             cli.summarize(self.root, self.dest, "test-model")
         self.assertFalse((self.dest / "summaries/recap.draft.md").exists())
 
@@ -165,15 +166,23 @@ class PipelineTests(unittest.TestCase):
         cli.save_json(self.dest / "transcripts/transcript.json", {"segments": segments})
         def fake_api(endpoint, body):
             data = json.loads(body)
+            if "Campaign relevance extraction v1" in data["instructions"]:
+                import re
+                ids = re.findall(r"\[(c\d+:s\d+)\]", data["input"])
+                return response(json.dumps({"items": [{"source_ids": [i], "category": "campaign",
+                                                       "note": "x" * 1000} for i in ids]}))
             if "partial session" in data["instructions"]:
-                return response("Evidence notes [c0000:s0000]")
+                from dnd_recaps.relevance import citations
+                return response("Evidence notes " + " ".join(f"[{i}]" for i in sorted(citations(data["input"]))))
             return response("# Session recap\nA tale [c0000:s0000]")
         with patch.object(cli, "api", side_effect=fake_api) as api, contextlib.redirect_stdout(io.StringIO()):
             cli.summarize(self.root, self.dest, "test-model")
         sent = "".join(json.loads(call.args[1])["input"] for call in api.call_args_list)
         for segment in segments:
             self.assertIn(f"[{segment['id']}]", sent)
-        self.assertEqual(api.call_count, 4)  # Three extraction requests and a final recap.
+        tasks = [json.loads(call.args[1])["instructions"] for call in api.call_args_list]
+        self.assertGreater(sum("Campaign relevance extraction v1" in task for task in tasks), 1)
+        self.assertTrue(any("partial session" in task for task in tasks))
 
     def test_cloud_flag_is_required_before_api_use(self):
         with patch.object(cli.sys, "argv", ["dnd-recaps", "transcribe", "test"]), \

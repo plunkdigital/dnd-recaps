@@ -16,6 +16,14 @@ Separate proposals, jokes, speculation, NPC claims, and opening recaps of older
 sessions from events that actually happened. Prefer the final resolved outcome
 when players retract an action or the DM corrects a statement.
 
+Exclude unrelated table chatter from the tale, appendix, and proposed updates.
+Out-of-character campaign decisions, rulings, and corrections can still matter.
+If campaign relevance is unclear, withhold the material pending human review.
+The extraction stage records such questions separately for manual-check.draft.md;
+never turn a question into an event, guess its answer, or reintroduce excluded
+topics during reduction. Follow the stage's JSON contract when extracting; use
+the story sections below only when writing the final recap from campaign notes.
+
 Speaker labels are acoustic labels, not character identities. Cloud labels are
 chunk-local; local diarization labels are session-local as recorded in its metadata.
 Never join numeric labels across recordings. Only explicitly reviewed mappings to

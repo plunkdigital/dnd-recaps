@@ -48,6 +48,13 @@ reads that JSON. Markdown is a convenience view and is rebuilt by `transcribe`.
 Do not rerun `transcribe` after manual JSON edits unless you intend to rebuild it
 from cached raw responses. Keep corrections documented in a session `review.md`.
 
+Summarization excludes unrelated table chatter and withholds topics whose campaign
+relevance is unclear. Open the session's `manual-check.md` for links to generated
+review drafts containing source IDs, timestamps, and questions. Keep your decisions
+in that index or `review.md`; generated `manual-check.draft.md` files beside each
+backend's recap are replaced on rerun. The selection pass uses additional cached
+OpenAI text requests. See [review and rerun behavior](docs/workflow.md#campaign-relevance-and-manual-checks).
+
 After checking evidence and spoilers, copy the draft to `summaries/recap.reviewed.md`,
 record the reviewer/date in `review.md`, and update `context/campaign/state.md`
 manually with session and segment references. The pipeline never promotes drafts

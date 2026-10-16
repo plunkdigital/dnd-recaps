@@ -142,6 +142,10 @@ audio citations for historical notes or narrate old events as new-session events
   Preserve these questions through intermediate notes and deliver the manual check
   document with the completed drafts. Follow `docs/workflow.md` for its format;
   never resolve relevance using outside adventure lore or guesses.
+  `summarize` generates backend-specific `manual-check.draft.md`/`.json` files and
+  creates a session `manual-check.md` index only if absent. Preserve that index and
+  `review.md` as human-owned decision logs. Questions must bypass narrative reduction;
+  validate batch source-ID coverage and never cite withheld IDs in campaign notes.
 - Fantasy names, numbers, negation, crosstalk, music, and silence need special review.
   Mark uncertainty rather than guessing; aliases are suggestions, not corrections.
 - Capture exploration, social scenes, consequential combat outcomes, character

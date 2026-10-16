@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from dnd_recaps import cli, gpu
+from summary_fixtures import summary_reply
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -163,9 +164,7 @@ class GpuTests(unittest.TestCase):
         cli.save_json(self.dest / "transcripts/cuda/transcript.json", transcript)
         cli.write(self.dest / "transcripts/transcript.json", "CLOUD_INPUT_SENTINEL")
         cli.write(self.dest / "summaries/recap.draft.md", "CLOUD_RECAP_SENTINEL")
-        output = {"status": "completed", "output": [{"type": "message", "content": [
-            {"type": "output_text", "text": "A tale [c0000:s0002]"}]}]}
-        with patch.object(cli, "api", return_value=output) as api, contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(cli, "api", side_effect=summary_reply("A tale [c0000:s0002]")) as api, contextlib.redirect_stdout(io.StringIO()):
             cli.summarize(self.root, self.dest, "fixture-model", backend="cuda")
         self.assertNotIn("CLOUD_INPUT_SENTINEL", api.call_args.args[1].decode())
         self.assertEqual((self.dest / "summaries/recap.draft.md").read_text(), "CLOUD_RECAP_SENTINEL")
@@ -180,9 +179,7 @@ class GpuTests(unittest.TestCase):
                       cli.read_json(ROOT / "examples/transcript.json"))
         cli.write(self.dest / "transcripts/cuda-diarized/speaker-proposals.json", "UNREVIEWED_VOICE_NAME")
         cli.write(self.root / "recordings/catalog/voice-profiles.json", "PRIVATE_VECTOR_DATA")
-        output = {"status": "completed", "output": [{"type": "message", "content": [
-            {"type": "output_text", "text": "A tale [c0000:s0002]"}]}]}
-        with patch.object(cli, "api", return_value=output) as api, contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(cli, "api", side_effect=summary_reply("A tale [c0000:s0002]")) as api, contextlib.redirect_stdout(io.StringIO()):
             cli.summarize(self.root, self.dest, "fixture-model", backend="cuda-diarized")
         payload = api.call_args.args[1].decode()
         self.assertNotIn("UNREVIEWED_VOICE_NAME", payload)

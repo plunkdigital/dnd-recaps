@@ -5,35 +5,23 @@ belongs in `context/campaign/state.md`; keep those two kinds of state separate.
 
 ## Current phase
 
-Latest user run confirms real first-recording GPU ASR now completes all 13 chunks
-in about 323 seconds. Diarization segmentation took 12 seconds; embeddings showed
-42 percent and `0:16:29`, prompting performance review. Community-1 already uses
-batch size 32. The wrapper now preloads mono audio in RAM once to avoid per-window
-decoder creation. A synthetic crop check preserved every sample and reduced decoder
-opens from 100 to one; all 54 offline tests passed. Real embedding speedup remains
-unmeasured. The active process was left alone; later session processes pick up the
-change. See [embedding performance checklist](DIARIZATION_SPEED_PLAN.md) and
-[running-job guidance](local-diarization.md#embedding-performance).
+Automatic relevance review is implemented. Every transcript batch is classified
+with validated source-ID coverage before campaign evidence notes reach the story.
+Unrelated chatter is omitted; ambiguous topics are withheld and retained outside
+recursive reduction in backend-specific `manual-check.draft.md`/`.json` files.
+The session's `manual-check.md` index and `review.md` remain human-owned decision
+logs. All 67 offline tests pass, including multi-batch preservation, withheld-ID
+checks, incomplete/malformed responses, cache invalidation, and backend isolation.
+No paid calls or real-audio processing occurred during this change. See the
+[implementation checklist](MANUAL_CHECK_PLAN.md) and
+[review workflow](workflow.md#campaign-relevance-and-manual-checks).
 
-Latest repair: user terminal confirms CUDA discovery and Community-1 access/CUDA
-initialization. First ASR chunk failed before completion because PyAV 19.0.1 rejects
-faster-whisper 1.2.1's `metadata_errors` keyword. Reproduced using synthetic audio;
-installed and pinned PyAV 18.0.0, added a decoder preflight and sanitized backend
-TypeError handling. All 52 offline tests, actual synthetic decoding/VAD, and package
-compatibility checks pass. Real ASR inference remains unverified. Retry only the
-first transcription stage before unattended recaps; the manual-check deliverable
-below still needs CLI implementation. See [repair checklist](GPU_DECODER_FIX_PLAN.md).
-
-Latest requirement: omit clearly unrelated table conversation from recaps. Topics
-whose campaign relevance is unclear stay out of drafts pending review and belong
-in each session's `manual-check.md`, with source IDs, timestamps, questions, and
-review decisions. See [relevance and manual checks](workflow.md#campaign-relevance-and-manual-checks).
-The agent instructions and always-loaded public overview now carry this rule.
-This documentation update does not add automatic manual-check file generation;
-the CLI extraction/output work remains pending before unattended processing.
-Verification for this update: all 50 offline tests passed, including campaign
-context-budget checks; documentation links, consistency, and Git whitespace checked.
-No recordings processed or provider calls made.
+The user confirms first-recording GPU ASR completed all 13 chunks in about 323
+seconds and full-recording diarization subsequently completed. Embeddings took
+34 minutes 20 seconds; clustering continued without a progress bar. The wrapper
+now preloads mono audio in RAM to avoid per-window decoder creation; real speedup
+is unmeasured. PyAV 18.0.0 fixed the initial ASR decoder incompatibility. See the
+[decoder repair](GPU_DECODER_FIX_PLAN.md) and [embedding work](DIARIZATION_SPEED_PLAN.md).
 
 Initial scaffold and sibling-repository preference review were committed in
 `d181d42`. Player-context and runtime-configuration changes are committed in
@@ -52,9 +40,10 @@ own identities. The user says they are stopping the cloud batch locally; the age
 did not terminate it. Two completed cloud chunks for the first recording were
 visible during this investigation and were preserved.
 
-All 50 offline tests pass; installed packages import and dependency checks pass.
-Actual model access, GPU inference, and voice-match quality remain unverified:
-this runtime cannot access CUDA (including elevated checks) or protected credentials.
+At initial setup all 50 offline tests and package import/dependency checks passed.
+Model access, ASR inference, and full diarization were later confirmed by user output.
+Voice-match quality and optimized embedding speed remain unverified; this agent
+runtime cannot access CUDA or protected credentials.
 See [local diarization setup](local-diarization.md),
 [diarization checklist](LOCAL_DIARIZATION_PLAN.md), and [GPU setup](gpu-transcription.md).
 
@@ -110,26 +99,19 @@ See [DM and inbox checklist](DM_AND_INBOX_PLAN.md) and
 
 ## Immediate next step and remaining setup
 
-Let the user's active diarization finish; do not run another writer for that session.
-Subsequent session processes use preloaded waveform input automatically. The first
-ASR stage is now verified by user output, so the earlier retry note below is historical.
-Check real embedding timings and speaker output quality after completion. The
-manual-check file-generation requirement remains pending implementation.
-
-The user's output confirms model access and CUDA initialization now succeed.
-After the decoder repair, retry the first ASR stage locally:
+The user's first diarization has completed. Let any active summary writer finish.
+Later summary processes in the existing batch automatically use the new relevance
+workflow. If Session 1 summarized with the older process, rerun only its summary
+after that session has no active writer:
 
 ```bash
-./scripts/gpu_python.sh -m dnd_recaps transcribe session-001-spice-bag --backend cuda
+./scripts/gpu_python.sh -m dnd_recaps summarize session-001-spice-bag --transcript-backend cuda-diarized --allow-cloud
 ```
 
-Resume the full batch after verifying that inference works and implementing the
-required separate manual-check output. No agent credentials were loaded.
-
-The batch now runs local ASR, full-recording local diarization, and cloud text recaps
-in separate `cuda-diarized/` directories. The neural models require CUDA; decoding
-and clustering use CPU as needed. No neural CPU fallback is permitted. Neither GPU
-availability nor speed is established by mocked tests or successful imports.
+This performs cached/paid text work only, with no repeated GPU ASR or diarization.
+Review `sessions/session-001-spice-bag/manual-check.md` and its linked diarized
+report. Keep decisions in that index or `review.md`; generated drafts are replaced
+on rerun. Check facts, relevance, speaker identities, and audience before sharing.
 
 The first known speaker identities must be reviewed with `map-speaker`. Subsequent
 recordings write `speaker-proposals.md` for review; `propose-speakers` refreshes them

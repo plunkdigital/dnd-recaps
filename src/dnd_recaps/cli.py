@@ -304,35 +304,70 @@ def summarize(root, dest, model, backend="openai"):
         instructions += "\nAcoustic labels are session-local and may be wrong. Unknown labels mark uncertain/overlapping speech. They are not player or character identities; use explicit reviewed mappings only."
         instructions += "\nOnly the active reviewed speaker_map applies. speaker_map_history records superseded corrections, not additional identities. Voice-match proposals are not approved identity evidence."
     cache = summary_dir / "cache"
-    notes = batches(text)
-    # Map all transcript batches, then recursively reduce bounded groups.
+    from .relevance import (EXTRACTION_TASK, citations, parse_extraction, publish_checks,
+                            render_checks, select_evidence, source_batches)
+    items = []
+    extraction_batches = source_batches(transcript["segments"], render)
+    for index, (batch, expected) in enumerate(extraction_batches, 1):
+        print(f"Campaign relevance review: batch {index}/{len(extraction_batches)}", flush=True)
+        task = EXTRACTION_TASK + "\nRequired source IDs for this batch: " + json.dumps(sorted(expected))
+        output = generate(instructions + task, batch, model, cache)
+        items.extend(parse_extraction(output, expected))
+    selected, allowed, checks = select_evidence(items)
+    notes = batches(selected)
+    instructions += "\nRecap input SHA-256: " + hashlib.sha256(text.encode()).hexdigest()
+    recap = None
+    level = 0
+    if not notes:
+        recap = ("# Session recap\n\nNo campaign events were established for inclusion in this draft. "
+                 "See the separate manual-check draft for any topics withheld pending review.")
+    # Questions are retained separately, never compressed or fed into the tale.
     for level in range(8):
+        if recap is not None:
+            break
         final = len(notes) == 1
+        print("Generating final recap..." if final else
+              f"Reducing campaign notes: level {level + 1}, {len(notes)} batches", flush=True)
         task = ("\nWrite the final recap using the required sections." if final else
                 "\nExtract compact chronological evidence notes from this partial session. "
                 "Preserve source IDs, outcomes, uncertainties, and all unresolved threads; "
                 "do not write a final recap yet.")
-        outputs = [generate(instructions + task, note, model, cache) for note in notes]
+        outputs = []
+        for note in notes:
+            output = generate(instructions + task, note, model, cache)
+            cited = citations(output)
+            if not cited or not cited <= citations(note) or not cited <= allowed:
+                raise ValueError("Recap/notes lack valid campaign source IDs or include withheld IDs. Inspect cached output.")
+            outputs.append(output)
         if final:
             recap = outputs[0]
-            known = {s["id"] for s in transcript["segments"]}
-            cited = set(re.findall(r"\[(c\d+:s\d+)\]", recap))
-            if not cited or not cited <= known:
-                raise ValueError("Recap lacks valid source IDs or includes unknown IDs. Inspect cached output.")
-            write(summary_dir / "recap.draft.md", "<!-- UNREVIEWED: verify facts and audience before sharing. -->\n\n" + recap + "\n")
-            save_json(summary_dir / "provenance.json", {
-                "model": model, "transcript_sha256": digest(transcript_path),
-                "transcription_backend": backend,
-                "reviewed_speaker_map": transcript.get("reviewed_speaker_map", {}),
-                "prompt_sha256": digest(root / "prompts/recap.md"),
-                "context_sha256": hashlib.sha256((context + metadata).encode()).hexdigest(),
-                "review_status": "unreviewed", "reduction_levels": level,
-                "context_policy": policy, "context_files": list(names),
-            })
-            print(f"Created {summary_dir.relative_to(dest)}/recap.draft.md. Review before promoting campaign updates.")
-            return
+            break
         notes = batches("\n".join(outputs))
-    raise ValueError("Summary reduction did not converge; cached intermediate responses are retained.")
+    if recap is None:
+        raise ValueError("Summary reduction did not converge; cached intermediate responses are retained.")
+    transcript_hash = digest(transcript_path)
+    report = render_checks(checks, transcript["segments"], backend, transcript_hash)
+    report_hash = publish_checks(dest, summary_dir, report, {
+        "schema_version": 1, "extraction_status": "complete", "human_review_status": "pending",
+        "transcription_backend": backend, "transcript_sha256": transcript_hash,
+        "extraction_batches": len(extraction_batches), "checks": checks,
+        "campaign_source_ids": sorted(allowed),
+    })
+    write(summary_dir / "recap.draft.md", "<!-- UNREVIEWED: verify facts and audience before sharing. -->\n\n" + recap + "\n")
+    save_json(summary_dir / "provenance.json", {
+        "model": model, "transcript_sha256": transcript_hash,
+        "transcription_backend": backend,
+        "reviewed_speaker_map": transcript.get("reviewed_speaker_map", {}),
+        "prompt_sha256": digest(root / "prompts/recap.md"),
+        "context_sha256": hashlib.sha256((context + metadata).encode()).hexdigest(),
+        "review_status": "unreviewed", "reduction_levels": level,
+        "context_policy": policy, "context_files": list(names),
+        "relevance_extraction_version": 1, "extraction_batches": len(extraction_batches),
+        "manual_check_sha256": report_hash, "manual_check_count": len(checks),
+        "recap_sha256": digest(summary_dir / "recap.draft.md"),
+    })
+    print(f"Created {summary_dir.relative_to(dest)}/recap.draft.md and manual-check.draft.md. "
+          "Open the session's manual-check.md to review before sharing.")
 
 
 def main():

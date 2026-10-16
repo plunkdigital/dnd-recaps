@@ -56,7 +56,8 @@ session finish to retain its work. Stopping it discards in-progress diarization,
 because speaker turns are cached only when the complete recording succeeds; ASR
 chunks stay reusable. Do not launch another writer for the same session. Completed
 turn caches remain reusable with this IO change and are not forcibly recomputed.
-The separate manual-check output requirement remains pending CLI implementation.
+Summarization now writes separate relevance-review drafts and a human-owned session
+index. See [manual checks and summary-only reruns](workflow.md#campaign-relevance-and-manual-checks).
 
 ### Alignment and evidence
 

@@ -74,8 +74,8 @@ inference was performed by the agent. Existing completed caches are preserved.
 Retry the first recording with the transcription-only command above. A public
 Whisper download may warn about anonymous Hugging Face access: local ASR does not
 load `.env`, whereas diarization loads only `HF_TOKEN`. This warning did not cause
-the decoder failure. Separate manual-check file generation remains pending, as
-recorded in [current state](PROJECT_STATE.md), before unattended recap delivery.
+the decoder failure. Separate manual-check file generation is now implemented;
+see [review outputs and summary-only reruns](workflow.md#campaign-relevance-and-manual-checks).
 
 Installed and import-checked on Python 3.14.4: faster-whisper 1.2.1, CTranslate2
 4.8.3, cuBLAS 12.8.4.1, and cuDNN 9.19.0.56. The resolved Linux/Python 3.14 pins
