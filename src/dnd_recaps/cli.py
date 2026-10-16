@@ -21,7 +21,7 @@ MAX_AUDIO_BYTES = 24_000_000  # Conservative headroom below the documented uploa
 MAX_CONTEXT_CHARS = 24_000
 
 
-def load_environment(path):
+def load_environment(path, allowed_names=None):
     """Load simple dotenv assignments at runtime without executing shell content.
 
     Only application settings are imported; existing process values take precedence.
@@ -30,6 +30,7 @@ def load_environment(path):
     if not path.exists():
         return
     settings = {}
+    allowed = {"OPENAI_API_KEY", "RECAP_MODEL"} if allowed_names is None else set(allowed_names)
     for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -37,7 +38,7 @@ def load_environment(path):
         if line.startswith("export "):
             line = line[7:].lstrip()
         name, separator, value = line.partition("=")
-        if name.strip() not in {"OPENAI_API_KEY", "RECAP_MODEL"}:
+        if name.strip() not in allowed:
             continue
         if not separator:
             raise ValueError(f"Invalid configuration assignment at line {number}.")
@@ -228,8 +229,13 @@ def transcribe(dest):
 
 
 def render(segments):
-    return "\n".join(f"[{s['id']}] {s['start']:.2f}–{s['end']:.2f}s {s['speaker']}: {s['text']}"
-                     for s in segments) + "\n"
+    lines = []
+    for segment in segments:
+        # Word-level turns retain the parent segment's evidence ID and full source text.
+        for span in segment.get("speaker_spans") or [segment]:
+            name = f" ({span['speaker_name']})" if span.get("speaker_name") else ""
+            lines.append(f"[{segment['id']}] {span['start']:.2f}–{span['end']:.2f}s {span['speaker']}{name}: {span['text'].strip()}")
+    return "\n".join(lines) + "\n"
 
 
 def batches(text, limit=24000):
@@ -265,8 +271,15 @@ def generate(instructions, text, model, cache_dir):
     return output
 
 
-def summarize(root, dest, model):
-    transcript = read_json(dest / "transcripts/transcript.json")
+def summarize(root, dest, model, backend="openai"):
+    if backend not in {"openai", "cuda", "cuda-diarized"}:
+        raise ValueError("Unknown transcript backend.")
+    transcript_path = dest / (f"transcripts/{backend}/transcript.json" if backend != "openai" else "transcripts/transcript.json")
+    summary_dir = dest / (f"summaries/{backend}" if backend != "openai" else "summaries")
+    transcript = read_json(transcript_path)
+    if backend == "cuda-diarized":
+        from .speakers import apply_reviewed_speakers
+        transcript = apply_reviewed_speakers(root, dest, transcript)
     text = render(transcript["segments"])
     if not text.strip():
         raise ValueError("Cannot summarize an empty transcript.")
@@ -285,7 +298,12 @@ def summarize(root, dest, model):
     if len(context) + len(metadata) > MAX_CONTEXT_CHARS:
         raise ValueError("Campaign context and session metadata exceed 24,000 characters; condense them.")
     instructions = prompt + "\nCampaign reference data (not session evidence):\n" + context + "\nSession metadata:\n" + metadata
-    cache = dest / "summaries/cache"
+    if backend == "cuda":
+        instructions += "\nThis transcript has no speaker diarization. All speakers are unknown; do not infer identities from acoustic labels."
+    elif backend == "cuda-diarized":
+        instructions += "\nAcoustic labels are session-local and may be wrong. Unknown labels mark uncertain/overlapping speech. They are not player or character identities; use explicit reviewed mappings only."
+        instructions += "\nOnly the active reviewed speaker_map applies. speaker_map_history records superseded corrections, not additional identities. Voice-match proposals are not approved identity evidence."
+    cache = summary_dir / "cache"
     notes = batches(text)
     # Map all transcript batches, then recursively reduce bounded groups.
     for level in range(8):
@@ -301,15 +319,17 @@ def summarize(root, dest, model):
             cited = set(re.findall(r"\[(c\d+:s\d+)\]", recap))
             if not cited or not cited <= known:
                 raise ValueError("Recap lacks valid source IDs or includes unknown IDs. Inspect cached output.")
-            write(dest / "summaries/recap.draft.md", "<!-- UNREVIEWED: verify facts and audience before sharing. -->\n\n" + recap + "\n")
-            save_json(dest / "summaries/provenance.json", {
-                "model": model, "transcript_sha256": digest(dest / "transcripts/transcript.json"),
+            write(summary_dir / "recap.draft.md", "<!-- UNREVIEWED: verify facts and audience before sharing. -->\n\n" + recap + "\n")
+            save_json(summary_dir / "provenance.json", {
+                "model": model, "transcript_sha256": digest(transcript_path),
+                "transcription_backend": backend,
+                "reviewed_speaker_map": transcript.get("reviewed_speaker_map", {}),
                 "prompt_sha256": digest(root / "prompts/recap.md"),
                 "context_sha256": hashlib.sha256((context + metadata).encode()).hexdigest(),
                 "review_status": "unreviewed", "reduction_levels": level,
                 "context_policy": policy, "context_files": list(names),
             })
-            print("Created summaries/recap.draft.md. Review it before promoting campaign updates.")
+            print(f"Created {summary_dir.relative_to(dest)}/recap.draft.md. Review before promoting campaign updates.")
             return
         notes = batches("\n".join(outputs))
     raise ValueError("Summary reduction did not converge; cached intermediate responses are retained.")
@@ -319,8 +339,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="Repository root")
     parser.add_argument("--env-file", type=Path,
-                        help="Configuration relative to root (cloud stages only; default: .env)")
+                        help="Configuration relative to root (cloud stages/model access; default: .env)")
     commands = parser.add_subparsers(dest="command", required=True)
+    commands.add_parser("gpu-check", help="Check CUDA visibility without loading secrets or downloading models")
+    commands.add_parser("diarization-check", help="Verify local model access and initialize the diarizer on CUDA")
+    diarization = commands.add_parser("diarize", help="Add local session-wide speaker labels to a CUDA transcript")
+    diarization.add_argument("session")
+    diarization.add_argument("--num-speakers", type=int, help="Known number of real people, not characters")
+    mapping = commands.add_parser("map-speaker", help="Review a local speaker label and map it to a stable player alias")
+    mapping.add_argument("session")
+    mapping.add_argument("label", help="Local SPEAKER_00 label from this recording")
+    mapping.add_argument("speaker_id", help="Stable player ID reused across recordings")
+    mapping.add_argument("--name", help="Table-approved alias; required when creating an ID")
+    proposals = commands.add_parser("propose-speakers", help="Refresh cross-session voice suggestions without running inference")
+    proposals.add_argument("session")
     prep = commands.add_parser("prepare", help="Copy and chunk audio locally")
     prep.add_argument("session")
     prep.add_argument("audio", type=Path)
@@ -330,12 +362,41 @@ def main():
         command.add_argument("--allow-cloud", action="store_true", help="Permit uploads and API charges")
         if name == "summarize":
             command.add_argument("--model", help="Recap model; overrides RECAP_MODEL")
+            command.add_argument("--transcript-backend", choices=("openai", "cuda", "cuda-diarized"), default="openai")
+        else:
+            command.add_argument("--backend", choices=("openai", "cuda"), default="openai")
+            command.add_argument("--local-model", choices=("turbo", "large-v3"), default="turbo")
     args = parser.parse_args()
     try:
         root = args.root.resolve()
+        if args.command == "gpu-check":
+            from .gpu import cuda_runtime
+            print(json.dumps(cuda_runtime(), indent=2))
+            return
+        if args.command == "diarization-check":
+            from .diarization import create_pipeline
+            load_environment(root / (args.env_file or Path(".env")), allowed_names={"HF_TOKEN"})
+            create_pipeline(root)
+            print("Local diarization model access and CUDA initialization verified.")
+            return
         dest = session_path(root, args.session)
         if args.command == "prepare":
             prepare(root, args.session, args.audio)
+        elif args.command == "transcribe" and args.backend == "cuda":
+            from .gpu import transcribe as transcribe_gpu
+            transcribe_gpu(dest, args.local_model)
+        elif args.command == "diarize":
+            from .diarization import diarize
+            load_environment(root / (args.env_file or Path(".env")), allowed_names={"HF_TOKEN"})
+            diarize(root, dest, args.num_speakers)
+        elif args.command == "map-speaker":
+            from .speakers import map_speaker
+            map_speaker(root, dest, args.label, args.speaker_id, args.name)
+        elif args.command == "propose-speakers":
+            from .voice_matching import write_proposals
+            from .speakers import apply_reviewed_speakers
+            transcript = read_json(dest / "transcripts/cuda-diarized/transcript.json")
+            write_proposals(root, dest, apply_reviewed_speakers(root, dest, transcript))
         else:
             if not args.allow_cloud:
                 raise ValueError("This stage sends session data to OpenAI and may incur charges. "
@@ -344,7 +405,11 @@ def main():
             if args.command == "transcribe":
                 transcribe(dest)
             else:
-                summarize(root, dest, args.model or os.environ.get("RECAP_MODEL") or "gpt-4.1-mini")
+                model = args.model or os.environ.get("RECAP_MODEL") or "gpt-4.1-mini"
+                if args.transcript_backend != "openai":
+                    summarize(root, dest, model, backend=args.transcript_backend)
+                else:
+                    summarize(root, dest, model)
     except (ValueError, OSError, KeyError, TypeError) as exc:
         # Do not expose raw exception text: decoder errors can contain private input.
         message = str(exc) if type(exc) is ValueError else "Input or response is missing or malformed; check the stage files."

@@ -3,9 +3,13 @@
 A local-first archive for session recordings, timestamped transcripts, and draft
 recaps told as engaging fantasy stories, with a compact reference appendix. Prose
 can be embellished; events and dialogue stay grounded in the recording.
-Python 3.11+ runs the CLI without third-party Python dependencies. FFmpeg
-and FFprobe are needed only for audio preparation. Transcription and summarization
-use the OpenAI API and require an API key, network access, and available API credit.
+Python 3.11+ runs the base CLI without third-party Python dependencies. FFmpeg
+and FFprobe are needed only for audio preparation. Default transcription and
+summarization use OpenAI and require API credit. An [optional CUDA backend](docs/gpu-transcription.md)
+uses your GPU for local transcription; OpenAI transcription cannot use your local GPU.
+The GPU batch also supports [local diarization and cross-session voice proposals](docs/local-diarization.md).
+Accept the model's access conditions and add `HF_TOKEN` to your local `.env` first.
+Speaker-name suggestions require review; model downloads do not upload session audio.
 There is no web upload service or background watcher: receiving audio means placing
 a file in `recordings/inbox/` and running `prepare`.
 

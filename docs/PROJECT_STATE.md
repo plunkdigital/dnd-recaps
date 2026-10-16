@@ -9,9 +9,24 @@ Initial scaffold and sibling-repository preference review were committed in
 `d181d42`. Player-context and runtime-configuration changes are committed in
 `b8251f5`. DM-reference and recording intake were committed in `c9af644`.
 The first transcription/recap batch is authorized. All six recordings are prepared
-locally; cloud stages remain pending because this runtime has no API key and the
-real `.env` is protected by a non-escalatable read denial. No transcripts or recaps
-have been generated. See [first batch checklist](FIRST_BATCH_PLAN.md).
+locally. The user reports slow cloud processing; this runtime has no API key and
+cannot read the protected `.env`. At GPU investigation, no completed raw responses
+or recaps were visible. The agent has not stopped or replaced the user's cloud job.
+See [first batch checklist](FIRST_BATCH_PLAN.md).
+
+The user reports a 3080 and requests local transcription, diarization, and automatic
+cross-session voice proposals for review. This is implemented in the dedicated
+project `.venv`, with separate ASR, speaker-turn, labelled-transcript, and recap
+caches. Reviewed identities seed local voice profiles; matching never approves its
+own identities. The user says they are stopping the cloud batch locally; the agent
+did not terminate it. Two completed cloud chunks for the first recording were
+visible during this investigation and were preserved.
+
+All 50 offline tests pass; installed packages import and dependency checks pass.
+Actual model access, GPU inference, and voice-match quality remain unverified:
+this runtime cannot access CUDA (including elevated checks) or protected credentials.
+See [local diarization setup](local-diarization.md),
+[diarization checklist](LOCAL_DIARIZATION_PLAN.md), and [GPU setup](gpu-transcription.md).
 
 The CLI supports local preparation, cached diarized transcription, and bounded
 recursive recap generation. Recaps use embellished storytelling grounded in source
@@ -65,7 +80,28 @@ See [DM and inbox checklist](DM_AND_INBOX_PLAN.md) and
 
 ## Immediate next step and remaining setup
 
-The local operator can now run this from the repository root:
+The local operator must accept the Community-1 model conditions and add `HF_TOKEN`
+to the ignored `.env`, as documented in the linked setup guide. Then run:
+
+```bash
+./scripts/gpu_python.sh -m dnd_recaps gpu-check
+./scripts/gpu_python.sh -m dnd_recaps diarization-check
+./scripts/generate_recaps_gpu.sh --allow-cloud
+```
+
+The batch now runs local ASR, full-recording local diarization, and cloud text recaps
+in separate `cuda-diarized/` directories. The neural models require CUDA; decoding
+and clustering use CPU as needed. No neural CPU fallback is permitted. Neither GPU
+availability nor speed is established by mocked tests or successful imports.
+
+The first known speaker identities must be reviewed with `map-speaker`. Subsequent
+recordings write `speaker-proposals.md` for review; `propose-speakers` refreshes them
+without inference after initial enrollment. Accepted mappings keep stable participant
+IDs across sessions; numeric cluster labels alone never establish identity. Voice
+vectors stay in ignored local caches, and no real voice profiles have been enrolled
+by the agent. Model-access terms still require the user's own acceptance.
+
+The original cloud batch remains available:
 
 ```bash
 bash scripts/generate_recaps.sh --allow-cloud

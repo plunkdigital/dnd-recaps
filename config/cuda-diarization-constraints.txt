@@ -1,0 +1,6 @@
+# Tested Linux/Python 3.14 CUDA 12.8 stack; resolve with the official cu128 index.
+torch==2.11.0+cu128
+torchaudio==2.11.0+cu128
+torchcodec==0.11.0+cpu
+nvidia-cublas-cu12==12.8.4.1
+nvidia-cudnn-cu12==9.19.0.56

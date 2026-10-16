@@ -9,6 +9,20 @@ description = "Local session archive, audio transcription, and evidence-based D&
 requires-python = ">=3.11"
 dependencies = []
 
+[project.optional-dependencies]
+cuda = [
+  "faster-whisper>=1.2,<2",
+  "ctranslate2>=4.8,<5",
+  "nvidia-cublas-cu12; platform_system == 'Linux'",
+  "nvidia-cudnn-cu12>=9,<10; platform_system == 'Linux'",
+]
+diarization = [
+  "pyannote.audio==4.0.7",
+  "torch==2.11.0",
+  "torchaudio==2.11.0",
+  "torchcodec==0.11.0",
+]
+
 [project.scripts]
 dnd-recaps = "dnd_recaps.cli:main"
 

@@ -108,6 +108,34 @@ For a clean independent rerun, prepare the same source under a new session ID.
 
 Python tests use synthetic inputs and mocked provider calls. Live API compatibility
 and real recording quality must be validated when credentials and sample audio are
-available. FFmpeg is not bundled. No UI, hosted uploads, local ASR backend, automatic
+available. FFmpeg is not bundled. No UI, hosted uploads, automatic
 watcher, cost estimator, DM-only recap mode, voice reference enrollment, silence-based
 cuts, or long-term storage service is provided. Add these only when needed.
+
+## Optional local CUDA backend
+
+See `docs/gpu-transcription.md`. `transcribe --backend cuda` requires a visible,
+supported CUDA GPU and never falls back to CPU or OpenAI. It does not load `.env`.
+It stores its transcript and raw chunks under `transcripts/cuda/`, marking speakers
+unknown. `summarize --transcript-backend cuda --allow-cloud` reads only that local
+transcript and writes `summaries/cuda/`. The OpenAI path keeps its original paths.
+`diarize` adds full-recording local acoustic labels under `transcripts/cuda-diarized/`.
+Select `--transcript-backend cuda-diarized` to generate its own recap; this is now
+the GPU batch default. See `docs/local-diarization.md` for model access and review.
+Separate backend outputs protect running cloud work and preserve evidence identity.
+The optional dependencies are isolated in this repository's `.venv`; default CLI
+commands do not import them. `gpu-check` checks device visibility without model or
+secret loading. Actual model inference and utilization still need local verification.
+
+Local ASR now requests word timestamps; compatible old wordless caches remain usable
+at segment resolution. Speaker spans share their parent citation ID and preserve
+source text. Diarization turn caches do not depend on the ASR text, so correcting
+words only repeats alignment. Cached model/version/settings and source hashes define
+the speaker-turn identity. Reclustering cannot silently reuse reviewed numeric labels.
+
+Cross-session proposals compare only reviewed local voice profiles. Raw vectors stay
+in local ignored turn/profile caches; proposal scores and unreviewed names stay out of
+recap requests. `map-speaker` is an explicit operator review action that updates the
+stable alias registry and the current session mapping, enrolls a sufficient voice
+sample, and records corrections. `propose-speakers` refreshes suggestions without
+neural inference. Only active reviewed mappings enter labelled transcripts or recaps.

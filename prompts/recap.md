@@ -16,7 +16,11 @@ Separate proposals, jokes, speculation, NPC claims, and opening recaps of older
 sessions from events that actually happened. Prefer the final resolved outcome
 when players retract an action or the DM corrects a statement.
 
-Speaker labels are chunk-local acoustic labels, not character identities. A DM
+Speaker labels are acoustic labels, not character identities. Cloud labels are
+chunk-local; local diarization labels are session-local as recorded in its metadata.
+Never join numeric labels across recordings. Only explicitly reviewed mappings to
+stable player aliases establish identity; automatic voice proposals are unapproved.
+A DM
 may voice many NPCs; a player may speak out of character. Use a character name
 only when supported. Retain unclear fantasy names as uncertain; do not silently
 replace them using a glossary. Distinguish player knowledge from character knowledge.
