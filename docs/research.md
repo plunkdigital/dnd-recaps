@@ -65,3 +65,11 @@ No encounter descriptions, stat blocks, future plot, or DM solutions were adopte
 Table-specific names and Sessions 1–3 events come from the user's `characters.md`,
 not the published adventure. Its cited full recap has not been supplied separately.
 Keep that secondary-source history distinct from future audio-backed session facts.
+
+## Preparation performance, 2026-10-16
+
+The first real batch uses input-side `-ss` seeking so each audio chunk does not
+decode all earlier audio again. [FFmpeg's official documentation](https://ffmpeg.org/ffmpeg.html)
+explains that default accurate seeking discards the earlier seek-point samples
+during transcoding. Chunk offsets and five-second overlap remain unchanged. A
+synthetic silence-then-tone regression checks nonzero seeking and the excerpt duration.

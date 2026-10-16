@@ -7,8 +7,11 @@ belongs in `context/campaign/state.md`; keep those two kinds of state separate.
 
 Initial scaffold and sibling-repository preference review were committed in
 `d181d42`. Player-context and runtime-configuration changes are committed in
-`b8251f5`. The DM-reference and recording-intake increment is pending locally.
-No live provider processing or real session recording has been validated.
+`b8251f5`. DM-reference and recording intake were committed in `c9af644`.
+The first transcription/recap batch is authorized. All six recordings are prepared
+locally; cloud stages remain pending because this runtime has no API key and the
+real `.env` is protected by a non-escalatable read denial. No transcripts or recaps
+have been generated. See [first batch checklist](FIRST_BATCH_PLAN.md).
 
 The CLI supports local preparation, cached diarized transcription, and bounded
 recursive recap generation. Recaps use embellished storytelling grounded in source
@@ -36,8 +39,8 @@ See [DM and inbox checklist](DM_AND_INBOX_PLAN.md) and
 
 - Initial scaffold on 2026-10-16: 11 tests discovered, 10 passed, 1 skipped because
   FFmpeg was unavailable. CLI help and Git whitespace checks passed.
-- Live OpenAI calls and real-audio conversion remain unverified. The passing tests
-  use synthetic inputs and mocked provider calls.
+- At the initial baseline, live OpenAI calls and real-audio conversion were unverified.
+  Subsequent preparation checks are recorded below; provider calls remain unverified.
 - Documentation preference review on 2026-10-16: Markdown targets, consistency,
   authored-prose punctuation, and whitespace checked. No behavior tests rerun for
   this documentation-only change.
@@ -52,19 +55,31 @@ See [DM and inbox checklist](DM_AND_INBOX_PLAN.md) and
   headers and source hashes were inspected locally; no real audio was transcribed.
   Local catalog totals 19.99 hours, with no exact duplicates. Ordering is provisional
   from embedded UTC creation timestamps; upload timestamps were not used.
+- First batch on 2026-10-16: user confirmed the recording sequence. All 22 tests
+  passed, including nonzero audio seeking and exclusion of later historical context
+  from early-recording inputs. Shell syntax and Git whitespace checks passed.
+  All six real sources are unchanged; 63 prepared chunks passed hash, duration,
+  mono/24 kHz format, and upload-size checks. No live API calls occurred.
+  Interrupted third-recording artifacts were preserved separately; its canonical
+  preparation was regenerated and verified. Remaining cloud checks are outstanding.
 
 ## Immediate next step and remaining setup
 
-Six recordings are present in the inbox. Their candidate chronology and integrity
-metadata are saved under ignored `recordings/catalog/`. Originals and Windows
-sidecars were not renamed or removed. Confirm the chronology against play dates
-or recorded content before assigning session numbers. A descriptive recording ID
-can be used to prepare files locally before order is confirmed; see intake guidance.
-Local cloud stages can use the user's `.env` with explicit
-`--allow-cloud`. Agents use the safe test configuration and do not inspect secrets.
-Completion of initial real-session validation requires checking
-conversion, source timestamps, identities, factual accuracy, and story quality against
-that recording. These are outstanding operational checks, not missing CLI commands.
+The local operator can now run this from the repository root:
 
-No paid transcription or recap run was performed for this intake review. Future work with more than three substantive
-steps should have one linked checklist under `docs/`, updated as work proceeds.
+```bash
+bash scripts/generate_recaps.sh --allow-cloud
+```
+
+It processes the six prepared sessions in user-confirmed order using the operator's
+local `.env`, generating `transcripts/transcript.json`, a readable transcript, and
+`summaries/recap.draft.md` under each session. Completed request caches are reused
+on rerun. The agent must not load the protected secret file indirectly through this
+script. The user must run the command locally in this environment.
+
+Originals and Windows sidecars were not renamed or removed. The local catalog
+contains confirmed relative order and preparation status; exact play dates remain
+unset. Recordings 1–3 use `recording_only` context to avoid later-history leakage;
+4–6 use the supplied prior campaign history. DM context stays excluded throughout.
+After cloud completion, inspect speaker identities, factual support, completeness,
+and narrative quality against the audio before sharing drafts or promoting canon.

@@ -100,6 +100,14 @@ def run_media(command):
     return result.stdout
 
 
+def encode_chunk(original, target, offset):
+    # Input seeking avoids re-decoding hours of earlier audio for each chunk.
+    # Accurate seeking remains enabled by default during transcoding.
+    run_media(["ffmpeg", "-nostdin", "-v", "error", "-ss", str(offset),
+               "-i", str(original), "-t", "1200", "-map", "0:a:0", "-vn",
+               "-ac", "1", "-ar", "24000", "-b:a", "64k", str(target)])
+
+
 def prepare(root, session, audio):
     dest = session_path(root, session)
     if dest.exists():
@@ -126,9 +134,7 @@ def prepare(root, session, audio):
             relative = f"audio/chunks/c{index:04d}.mp3"
             target = stage / relative
             target.parent.mkdir(parents=True, exist_ok=True)
-            run_media(["ffmpeg", "-nostdin", "-v", "error", "-i", str(original),
-                       "-ss", str(offset), "-t", "1200", "-map", "0:a:0", "-vn",
-                       "-ac", "1", "-ar", "24000", "-b:a", "64k", str(target)])
+            encode_chunk(original, target, offset)
             if not 0 < target.stat().st_size < MAX_AUDIO_BYTES:
                 raise ValueError("Prepared audio chunk is empty or over the upload limit.")
             chunks.append({"id": f"c{index:04d}", "path": relative,
@@ -265,10 +271,17 @@ def summarize(root, dest, model):
     if not text.strip():
         raise ValueError("Cannot summarize an empty transcript.")
     prompt = (root / "prompts/recap.md").read_text(encoding="utf-8")
+    # Historical notes can spoil early recordings of the same campaign.
+    metadata_path = dest / "session.json"
+    metadata = metadata_path.read_text(encoding="utf-8")
+    policy = json.loads(metadata).get("context_policy", "campaign_history")
+    if policy not in {"recording_only", "campaign_history"}:
+        raise ValueError("Unknown session context_policy; use recording_only or campaign_history.")
+    names = (("overview.md",) if policy == "recording_only" else
+             ("overview.md", "characters.md", "glossary.md", "state.md"))
     # Explicit allowlist prevents accidental ingestion of DM-only notes.
     context = "\n".join((root / "context/campaign" / name).read_text(encoding="utf-8")
-                        for name in ("overview.md", "characters.md", "glossary.md", "state.md"))
-    metadata = (dest / "session.json").read_text(encoding="utf-8")
+                        for name in names)
     if len(context) + len(metadata) > MAX_CONTEXT_CHARS:
         raise ValueError("Campaign context and session metadata exceed 24,000 characters; condense them.")
     instructions = prompt + "\nCampaign reference data (not session evidence):\n" + context + "\nSession metadata:\n" + metadata
@@ -294,6 +307,7 @@ def summarize(root, dest, model):
                 "prompt_sha256": digest(root / "prompts/recap.md"),
                 "context_sha256": hashlib.sha256((context + metadata).encode()).hexdigest(),
                 "review_status": "unreviewed", "reduction_levels": level,
+                "context_policy": policy, "context_files": list(names),
             })
             print("Created summaries/recap.draft.md. Review it before promoting campaign updates.")
             return

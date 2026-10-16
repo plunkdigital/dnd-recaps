@@ -121,8 +121,11 @@ and a warning before a collapsed details section. Other DM files remain ignored.
 Do not open that reference during player recap work; it never enters recap inputs.
 See [workflow](docs/workflow.md) and [research](docs/research.md) for design details.
 The [synthetic recap example](examples/recap.md) illustrates the storytelling boundary.
-See [recording intake](docs/recording-intake.md) for the unordered inbox and the
-local catalog of proposed chronology. No original recordings have been renamed.
+See [recording intake](docs/recording-intake.md) for the user-confirmed recording
+sequence and local catalog. No original recordings have been renamed. Once the six
+sessions are prepared, `bash scripts/generate_recaps.sh --allow-cloud` runs their
+transcriptions and narrative recaps locally using `.env`. Existing response caches
+are reused on rerun; generated recaps remain drafts requiring review.
 
 ## Working conventions
 

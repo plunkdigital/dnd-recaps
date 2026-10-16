@@ -71,6 +71,10 @@ that repository, global settings, production services, or this project's scope.
   incomplete provider response as a successful recap.
 - Changes to prompts, context, transcript, or model must invalidate relevant summary
   caches. Prefer additive schema changes; document migrations before breaking IDs.
+- When processing earlier recordings, prevent later-session history from entering
+  recap inputs. `session.json` can set `context_policy: recording_only` to read only
+  the public premise in `overview.md`. First-batch recordings 1–3 use that policy;
+  later recordings may use `campaign_history`. Do not infer missing continuity.
 - Recheck official API documentation before changing model parameters, upload limits,
   or response formats. Sources and research dates belong in `docs/research.md`.
 - Never inspect, print, modify, or commit real `.env` files, credentials, or keys.

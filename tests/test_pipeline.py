@@ -103,6 +103,56 @@ class PipelineTests(unittest.TestCase):
             cli.summarize(self.root, self.dest, "test-model")
         self.assertFalse((self.dest / "summaries/recap.draft.md").exists())
 
+    def test_early_recordings_exclude_later_historical_context(self):
+        self.seed_transcript()
+        metadata = cli.read_json(self.dest / "session.json")
+        metadata["context_policy"] = "recording_only"
+        cli.save_json(self.dest / "session.json", metadata)
+        for name in ("characters.md", "glossary.md", "state.md"):
+            (self.root / "context/campaign" / name).write_text("LATER_SESSION_SENTINEL", encoding="utf-8")
+        output = response("The guard offered a key. [c0000:s0002]")
+        with patch.object(cli, "api", return_value=output) as api, contextlib.redirect_stdout(io.StringIO()):
+            cli.summarize(self.root, self.dest, "test-model")
+        self.assertNotIn("LATER_SESSION_SENTINEL", api.call_args.args[1].decode())
+        provenance = cli.read_json(self.dest / "summaries/provenance.json")
+        self.assertEqual(provenance["context_files"], ["overview.md"])
+
+    def test_unknown_history_policy_fails_before_cloud_processing(self):
+        self.seed_transcript()
+        metadata = cli.read_json(self.dest / "session.json")
+        metadata["context_policy"] = "misspelled-policy"
+        cli.save_json(self.dest / "session.json", metadata)
+        with patch.object(cli, "api") as api, self.assertRaises(ValueError):
+            cli.summarize(self.root, self.dest, "test-model")
+        api.assert_not_called()
+
+    @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg unavailable")
+    def test_nonzero_chunk_seek_preserves_late_audio(self):
+        import array
+        import math
+        import subprocess
+        import wave
+        source = self.root / "silence-then-tone.wav"
+        samples = array.array("h", [0] * 16000 + [
+            round(10000 * math.sin(2 * math.pi * 440 * i / 8000)) for i in range(16000)])
+        if cli.sys.byteorder != "little":
+            samples.byteswap()
+        with wave.open(str(source), "wb") as stream:
+            stream.setnchannels(1)
+            stream.setsampwidth(2)
+            stream.setframerate(8000)
+            stream.writeframes(samples.tobytes())
+        target = self.root / "late.mp3"
+        cli.encode_chunk(source, target, 3)
+        result = subprocess.run(["ffmpeg", "-v", "error", "-i", str(target), "-f", "s16le",
+                                 "-ac", "1", "-ar", "8000", "pipe:1"], capture_output=True, check=True)
+        decoded = array.array("h")
+        decoded.frombytes(result.stdout)
+        if cli.sys.byteorder != "little":
+            decoded.byteswap()
+        self.assertAlmostEqual(len(decoded) / 8000, 1, delta=0.1)
+        self.assertGreater(sum(abs(v) for v in decoded) / len(decoded), 1000)
+
     def test_unknown_citation_never_publishes_recap(self):
         self.seed_transcript()
         with patch.object(cli, "api", return_value=response("Invented [c9999:s9999]")), self.assertRaises(ValueError):

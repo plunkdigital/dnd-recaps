@@ -9,17 +9,23 @@ sizes, durations, embedded creation timestamps, audio-stream properties, and pro
 order. `recordings/catalog/order-review.md` is the readable review copy. These are
 metadata-derived candidates, not reviewed session numbering. They contain no DM lore.
 
-## Proposed chronology
+## Confirmed chronology
+
+The user confirmed the six-recording sequence on 2026-10-16. The local catalog now
+records that confirmation and stable `session-001-...` through `session-006-...` IDs.
+This confirms relative order, not that embedded dates are exact play dates or that
+no sessions are missing. `played_on` remains blank pending date confirmation.
 
 Order is based on the M4A container's `creation_time`, normalized to UTC. These may
 represent recorder clocks or export dates rather than actual play dates. Do not use
 upload/modification time as recording chronology. All six files have distinct embedded
 timestamps, so there is a complete candidate order without guessing from titles.
 
-Do not rename originals or assign canonical session numbers until the timestamps
-are confirmed against the table calendar or recorded content. The first three files
-have not been proven to match the supplied Sessions 1–3 notes. There may be missing
-sessions, multi-part recordings, or exports made after play.
+The batch uses sequential session IDs in this confirmed recording order. Original
+filenames remain unchanged. The first three files have not yet been checked against
+the supplied Sessions 1–3 recap; use audio to establish that match. Their recaps use
+`context_policy: recording_only`, excluding later history from character/glossary/state
+documents. Later recordings can use the supplied prior-session campaign history.
 
 ## Working with unsorted recordings
 
@@ -39,6 +45,24 @@ recordings. They were excluded from the catalog and left in place. No attempt wa
 made to inspect their download-origin URLs. Exact source hashes identify duplicates;
 different hashes do not rule out overlapping recordings.
 
-When order is reviewed, record its basis and reviewer/date alongside the local
-catalog. Preserve original hashes and names as provenance. Never infer order from
+The user confirmation is recorded alongside the local catalog. Preserve original
+hashes and names as provenance. Never infer order from
 the published campaign's chapter sequence or from DM spoiler context.
+
+## First transcription and recap batch
+
+Once preparation is complete, the local operator can run all six cloud stages with:
+
+```bash
+bash scripts/generate_recaps.sh --allow-cloud
+```
+
+Run from the repository root. This loads the local `.env` through the existing CLI
+and processes each recording in confirmed order, stopping on the first failure.
+Rerun the same command to reuse completed transcription and summary caches. Do not
+edit normalized transcripts while rerunning this batch: transcription rebuilds them
+from raw cached responses. Outputs are drafts under each session's `summaries/`.
+
+The agent runtime has no environment-provided API key and may not read the protected
+`.env`, including indirectly through a script. The operator command is necessary
+for this environment's cloud stages; do not put a real key in `config/codex-test.env`.

@@ -41,7 +41,12 @@ references. Never silently map one acoustic label to the same person across chun
 ## 3. Generate a draft
 
 `summarize --allow-cloud` consumes the normalized transcript, session metadata,
-the versioned recap prompt, and exactly four player-safe campaign documents.
+the versioned recap prompt, and an explicit player-safe campaign allowlist.
+The default `context_policy: campaign_history` reads the four campaign files.
+`context_policy: recording_only` reads only `overview.md`, excluding historical
+character/glossary/state facts that could spoil earlier recordings. The first three
+confirmed recordings use this mode; subsequent ones use the supplied prior history.
+The policy and selected filenames are recorded in recap provenance and cache inputs.
 It does not read other session directories, arbitrary Markdown, or DM files.
 This includes the separately authorized, spoiler-labelled tracked DM reference.
 The reference is stored for explicit DM-reference work only; it is not background
