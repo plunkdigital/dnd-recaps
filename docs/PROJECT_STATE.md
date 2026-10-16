@@ -5,6 +5,17 @@ belongs in `context/campaign/state.md`; keep those two kinds of state separate.
 
 ## Current phase
 
+Latest requirement: omit clearly unrelated table conversation from recaps. Topics
+whose campaign relevance is unclear stay out of drafts pending review and belong
+in each session's `manual-check.md`, with source IDs, timestamps, questions, and
+review decisions. See [relevance and manual checks](workflow.md#campaign-relevance-and-manual-checks).
+The agent instructions and always-loaded public overview now carry this rule.
+This documentation update does not add automatic manual-check file generation;
+the CLI extraction/output work remains pending before unattended processing.
+Verification for this update: all 50 offline tests passed, including campaign
+context-budget checks; documentation links, consistency, and Git whitespace checked.
+No recordings processed or provider calls made.
+
 Initial scaffold and sibling-repository preference review were committed in
 `d181d42`. Player-context and runtime-configuration changes are committed in
 `b8251f5`. DM-reference and recording intake were committed in `c9af644`.

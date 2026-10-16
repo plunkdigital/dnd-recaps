@@ -86,6 +86,40 @@ retention. Check your account's data controls before sensitive processing.
 
 ## 4. Review and promote manually
 
+### Campaign relevance and manual checks
+
+Recordings include random conversation unrelated to the campaign. Exclude clearly
+irrelevant topics (for example, everyday errands, work, or unrelated entertainment)
+from the story, reference appendix, and proposed campaign updates. Preserve the
+audio and full transcript; this is a recap selection rule, not transcript deletion.
+Topic words alone do not establish relevance. Out-of-character planning, campaign
+rulings, retcons, and corrections can matter; an unrelated joke does not become a
+campaign event merely because a player or the DM said it.
+
+When context does not settle relevance, omit that material provisionally from the
+recap and retain a review question through extraction and reduction. At completion,
+provide `sessions/<session-id>/manual-check.md` alongside the drafts, separate from
+the narrative. Use one entry per ambiguous topic, combining repeated references:
+
+| Segment IDs | Recording timestamps | Neutral topic description | Why relevance is unclear / question | Decision and reviewer/date |
+| --- | --- | --- | --- | --- |
+| Existing cited IDs only | Start/end from transcript | Minimal description | What the reviewer needs to decide | Pending |
+
+Do not invent entries before reviewing a recording. If a complete review finds no
+ambiguous topics, state that explicitly; an unfinished review must remain marked
+incomplete. Avoid copying personal details or possible secrets into this document;
+use a neutral description and source pointers where an audience check is needed.
+The user reviews the document after processing, marking each item include, exclude,
+or unresolved. Record accepted corrections and evidence in the session's `review.md`;
+only resolved, supported campaign material may enter a revised recap. Keep unresolved
+items out of the tale and preserve their questions for later review.
+
+This is the required review deliverable for agent-assisted recap work. The current
+CLI does not automatically create a separate `manual-check.md`; automated extraction
+and file output still need implementation before claiming unattended compliance.
+
+### Evidence and approval
+
 - Check consequential facts against source audio at the cited times, especially
   names, deaths, negation, quest outcomes, loot ownership/quantities, and rulings.
 - Check the last scene, party condition, location, and agreed next step. Distinguish

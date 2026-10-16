@@ -133,6 +133,15 @@ audio citations for historical notes or narrate old events as new-session events
 - Distinguish what was proposed, attempted, resolved, retracted, recalled from a
   previous session, joked about, or asserted by an unreliable NPC. Summarize the
   resolved outcome; do not convert speculation into canon or a plan into an action.
+- Recordings include unrelated conversation. Exclude clearly non-campaign topics
+  from recaps and proposed campaign updates, while preserving the original audio
+  and transcript. Out-of-character discussion can still be relevant when it
+  establishes campaign decisions, rulings, corrections, or resolved outcomes.
+  If relevance is unclear, omit the material provisionally and record a question
+  in the session's `manual-check.md` with existing segment IDs and timestamps.
+  Preserve these questions through intermediate notes and deliver the manual check
+  document with the completed drafts. Follow `docs/workflow.md` for its format;
+  never resolve relevance using outside adventure lore or guesses.
 - Fantasy names, numbers, negation, crosstalk, music, and silence need special review.
   Mark uncertainty rather than guessing; aliases are suggestions, not corrections.
 - Capture exploration, social scenes, consequential combat outcomes, character

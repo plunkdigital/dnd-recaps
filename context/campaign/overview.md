@@ -23,4 +23,8 @@ Do not reveal unseen places, secrets, motives, future events, or stat blocks.
 Recaps: vivid third-person fantasy storytelling; about 150 words of opening and
 600–1000 words of tale, shorter if sparse, plus a compact reference appendix.
 Embellish prose, never dialogue, scenery, motives, actions, or outcomes beyond evidence.
+Recordings contain unrelated table chatter: omit clearly non-campaign conversation.
+Out-of-character campaign decisions, rulings, and corrections remain relevant.
+If campaign relevance is unclear, leave it out of the draft pending review and
+flag its segment IDs and timestamps in the session's separate `manual-check.md`.
 Recordings/cloud agreement and retention preferences remain to be confirmed.
