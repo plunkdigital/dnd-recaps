@@ -89,8 +89,12 @@ that repository, global settings, production services, or this project's scope.
 The user is a player, not the DM, in Icewind Dale: Rime of the Frostmaiden.
 `context/campaign/characters.md` is user-supplied historical context for Sessions
 1–3, including table-specific events. Preserve it. Public introductory setting
-material may supply the campaign premise only; do not read DM chapters, solutions,
-future encounters, hidden identities, or NPC motives to enrich player context.
+material may supply the campaign premise only. The user subsequently authorized
+a separately stored DM spoiler reference at `context/dm/SPOILERS-rime-of-the-frostmaiden.md`.
+Read or research it only for explicitly requested DM-reference maintenance, never
+to enrich player context, order recordings, or generate player recaps. Do not copy
+DM chapters, solutions, future encounters, hidden identities, or NPC motives into
+player context. Keep spoilers out of ordinary progress updates and final answers.
 Table history takes precedence over published adventure canon. Do not invent
 audio citations for historical notes or narrate old events as new-session events.
 

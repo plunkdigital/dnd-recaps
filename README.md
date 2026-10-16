@@ -71,7 +71,7 @@ context/
     characters.md         Player aliases, PCs, approved speaker mappings
     glossary.md           Canonical names and uncertain aliases
     state.md              Reviewed continuity with source references
-  dm/                     Local-only secrets; excluded from summary inputs
+  dm/                     SPOILERS reference; excluded from player summary inputs
 docs/
   workflow.md             Data contracts, review, recovery, limitations
   research.md             Primary sources and resulting design decisions
@@ -116,8 +116,13 @@ boundary dialogue needs review. Labels reset per chunk and do not prove identity
 Recordings, transcripts, and drafts stay out of Git. Reviewed campaign context is
 tracked, so add only information appropriate for repository readers. Git ignore is
 not encryption or a backup; arrange separate storage and retention for recordings.
+The user-requested DM reference is repository content with `SPOILERS` in its filename
+and a warning before a collapsed details section. Other DM files remain ignored.
+Do not open that reference during player recap work; it never enters recap inputs.
 See [workflow](docs/workflow.md) and [research](docs/research.md) for design details.
 The [synthetic recap example](examples/recap.md) illustrates the storytelling boundary.
+See [recording intake](docs/recording-intake.md) for the unordered inbox and the
+local catalog of proposed chronology. No original recordings have been renamed.
 
 ## Working conventions
 

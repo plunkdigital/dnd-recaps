@@ -15,7 +15,9 @@ dist/
 .DS_Store
 /recordings/inbox/*
 !/recordings/inbox/.gitkeep
+/recordings/catalog/
 /sessions/*
 !/sessions/.gitkeep
 /context/dm/*
 !/context/dm/README.md
+!/context/dm/SPOILERS-rime-of-the-frostmaiden.md

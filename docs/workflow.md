@@ -8,6 +8,9 @@ Put recordings in `recordings/inbox/`. Choose a unique ID such as
 mono MP3 chunks from the first audio stream. The source stays in place too.
 If your recording has separate per-player streams, retain them separately: this
 starter processes only stream `0:a:0`, not automatic multi-track alignment/mixing.
+For existing unordered files, see `docs/recording-intake.md`. Embedded timestamps
+can suggest chronology, but upload dates, titles, and published plot order cannot
+prove session numbers. Preserve original names and hashes until order is reviewed.
 
 Preparation builds a temporary directory and publishes it only after success.
 Existing session directories are refused. A source hash is an integrity identifier,
@@ -40,6 +43,9 @@ references. Never silently map one acoustic label to the same person across chun
 `summarize --allow-cloud` consumes the normalized transcript, session metadata,
 the versioned recap prompt, and exactly four player-safe campaign documents.
 It does not read other session directories, arbitrary Markdown, or DM files.
+This includes the separately authorized, spoiler-labelled tracked DM reference.
+The reference is stored for explicit DM-reference work only; it is not background
+context for player recap generation or media chronology.
 Metadata and context have a combined 24,000-character cap, accommodating the supplied
 Sessions 1–3 character history without truncation. Transcript batches are
 capped at 24,000 characters, with an explicit error for an oversized single line.

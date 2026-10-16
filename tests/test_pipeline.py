@@ -77,6 +77,8 @@ class PipelineTests(unittest.TestCase):
     def test_summary_caches_and_never_loads_dm_secrets(self):
         self.seed_transcript()
         (self.root / "context/dm/secret.md").write_text("SECRET_SENTINEL", encoding="utf-8")
+        (self.root / "context/dm/SPOILERS-rime-of-the-frostmaiden.md").write_text(
+            "TRACKED_DM_REFERENCE_SENTINEL", encoding="utf-8")
         output = response("# Session recap\nMira accepted the key. [c0000:s0002]")
         with patch.object(cli, "api", return_value=output) as api, contextlib.redirect_stdout(io.StringIO()):
             cli.summarize(self.root, self.dest, "test-model")
@@ -84,6 +86,7 @@ class PipelineTests(unittest.TestCase):
             self.assertEqual(api.call_count, 1)
             payload = json.loads(api.call_args.args[1])
             self.assertNotIn("SECRET_SENTINEL", json.dumps(payload))
+            self.assertNotIn("TRACKED_DM_REFERENCE_SENTINEL", json.dumps(payload))
             self.assertFalse(payload["store"])
             (self.root / "context/campaign/state.md").write_text("Updated reviewed state", encoding="utf-8")
             cli.summarize(self.root, self.dest, "test-model")
