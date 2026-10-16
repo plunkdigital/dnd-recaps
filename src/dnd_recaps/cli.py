@@ -18,6 +18,43 @@ import uuid
 
 TRANSCRIBE_MODEL = "gpt-4o-transcribe-diarize"
 MAX_AUDIO_BYTES = 24_000_000  # Conservative headroom below the documented upload limit.
+MAX_CONTEXT_CHARS = 24_000
+
+
+def load_environment(path):
+    """Load simple dotenv assignments at runtime without executing shell content.
+
+    Only application settings are imported; existing process values take precedence.
+    Values and source lines are never included in validation errors.
+    """
+    if not path.exists():
+        return
+    settings = {}
+    for number, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[7:].lstrip()
+        name, separator, value = line.partition("=")
+        if name.strip() not in {"OPENAI_API_KEY", "RECAP_MODEL"}:
+            continue
+        if not separator:
+            raise ValueError(f"Invalid configuration assignment at line {number}.")
+        value = value.strip()
+        if value.startswith(("'", '"')):
+            quote = value[0]
+            end = value.find(quote, 1)
+            if end < 0 or (value[end + 1:].strip() and not value[end + 1:].lstrip().startswith("#")):
+                raise ValueError(f"Invalid configuration quoting at line {number}.")
+            value = value[1:end]
+        else:
+            value = re.split(r"\s+#", value, maxsplit=1)[0].rstrip()
+        # No interpolation, shell expansion, or escape processing.
+        if value:
+            settings.setdefault(name.strip(), value)
+    for name, value in settings.items():
+        os.environ.setdefault(name, value)
 
 
 def digest(path):
@@ -110,7 +147,7 @@ def prepare(root, session, audio):
 def api(endpoint, body, content_type="application/json"):
     key = os.environ.get("OPENAI_API_KEY")
     if not key:
-        raise ValueError("Export OPENAI_API_KEY to run a cloud stage. No .env files are loaded.")
+        raise ValueError("Set OPENAI_API_KEY in the process environment or local .env to run a cloud stage.")
     request = Request("https://api.openai.com/v1/" + endpoint, data=body,
                       headers={"Authorization": f"Bearer {key}", "Content-Type": content_type})
     try:
@@ -232,8 +269,8 @@ def summarize(root, dest, model):
     context = "\n".join((root / "context/campaign" / name).read_text(encoding="utf-8")
                         for name in ("overview.md", "characters.md", "glossary.md", "state.md"))
     metadata = (dest / "session.json").read_text(encoding="utf-8")
-    if len(context) + len(metadata) > 16000:
-        raise ValueError("Campaign context and session metadata exceed 16,000 characters; condense them.")
+    if len(context) + len(metadata) > MAX_CONTEXT_CHARS:
+        raise ValueError("Campaign context and session metadata exceed 24,000 characters; condense them.")
     instructions = prompt + "\nCampaign reference data (not session evidence):\n" + context + "\nSession metadata:\n" + metadata
     cache = dest / "summaries/cache"
     notes = batches(text)
@@ -267,6 +304,8 @@ def summarize(root, dest, model):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="Repository root")
+    parser.add_argument("--env-file", type=Path,
+                        help="Configuration relative to root (cloud stages only; default: .env)")
     commands = parser.add_subparsers(dest="command", required=True)
     prep = commands.add_parser("prepare", help="Copy and chunk audio locally")
     prep.add_argument("session")
@@ -276,7 +315,7 @@ def main():
         command.add_argument("session")
         command.add_argument("--allow-cloud", action="store_true", help="Permit uploads and API charges")
         if name == "summarize":
-            command.add_argument("--model", default=os.environ.get("RECAP_MODEL", "gpt-4.1-mini"))
+            command.add_argument("--model", help="Recap model; overrides RECAP_MODEL")
     args = parser.parse_args()
     try:
         root = args.root.resolve()
@@ -287,10 +326,11 @@ def main():
             if not args.allow_cloud:
                 raise ValueError("This stage sends session data to OpenAI and may incur charges. "
                                  "Use --allow-cloud when ready.")
+            load_environment(root / (args.env_file or Path(".env")))
             if args.command == "transcribe":
                 transcribe(dest)
             else:
-                summarize(root, dest, args.model)
+                summarize(root, dest, args.model or os.environ.get("RECAP_MODEL") or "gpt-4.1-mini")
     except (ValueError, OSError, KeyError, TypeError) as exc:
         # Do not expose raw exception text: decoder errors can contain private input.
         message = str(exc) if type(exc) is ValueError else "Input or response is missing or malformed; check the stage files."

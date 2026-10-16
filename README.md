@@ -13,8 +13,9 @@ a file in `recordings/inbox/` and running `prepare`.
 
 1. Install Python 3.11+ and FFmpeg (`sudo apt install ffmpeg` on Debian/Ubuntu,
    `brew install ffmpeg` on macOS, or use your platform's package manager).
-2. Fill in the player-safe files under `context/campaign/`. Unknown campaign details
-   are intentionally blank. Keep GM-only material under `context/dm/`.
+2. Player-facing Rime of the Frostmaiden context and your Sessions 1–3 history are
+   already in `context/campaign/`. Preserve your `characters.md` as the historical
+   source. You are a player; no DM prep or future adventure information is needed.
 3. Place a recording in `recordings/inbox/`. Confirm the group is comfortable with
    recording and cloud processing before running cloud stages.
 4. From the repository root, run:
@@ -25,8 +26,12 @@ python3 -m dnd_recaps prepare 2026-10-16-session-001 recordings/inbox/session-00
 ```
 
 Edit the newly created `sessions/2026-10-16-session-001/session.json` with the
-campaign name, date, title, and participants. Set `OPENAI_API_KEY` in your shell
-using your usual secret manager. The application does not read `.env` files.
+campaign name, date, title, and participants. Your local `.env` can contain
+`OPENAI_API_KEY=your-key` and optionally `RECAP_MODEL=...`. Cloud commands load these
+settings automatically from the repository root, after `--allow-cloud` is checked.
+Existing process environment values take precedence; `--model` overrides the model.
+Preparation and help do not load configuration. Keep the real key only in your
+ignored local configuration or process environment.
 
 ```bash
 python3 -m dnd_recaps transcribe 2026-10-16-session-001 --allow-cloud
@@ -48,6 +53,14 @@ For an installed command, optionally use `python3 -m venv .venv`, activate it an
 `python3 -m pip install -e .`; then use `dnd-recaps` in place of the module command.
 Use `--root /path/to/dnd-recaps` before the subcommand when running elsewhere.
 
+For Codex checks, use `--env-file config/codex-test.env` before the subcommand.
+This tracked file lists setting names with an empty key, not a reference resolving
+to your real key. It cannot authorize a live API call. Automated tests use synthetic
+settings and mocked requests; agents must never inspect the real `.env`.
+The loader accepts simple `KEY=value` assignments, optional `export`, quotes, and
+comments for the two supported names. It does not execute shell code, interpolate
+variables, or support multiline values.
+
 ## Layout
 
 ```text
@@ -64,6 +77,7 @@ docs/
   research.md             Primary sources and resulting design decisions
 prompts/recap.md           Versioned grounding and recap instructions
 templates/session.json    Metadata template
+config/codex-test.env      Safe setting names; no real key
 recordings/inbox/          Incoming recordings (ignored by Git)
 sessions/<session-id>/     Private local artifacts (ignored by Git)
   session.json             Session metadata and provisional speaker map

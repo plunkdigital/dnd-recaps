@@ -40,11 +40,31 @@ references. Never silently map one acoustic label to the same person across chun
 `summarize --allow-cloud` consumes the normalized transcript, session metadata,
 the versioned recap prompt, and exactly four player-safe campaign documents.
 It does not read other session directories, arbitrary Markdown, or DM files.
-Metadata and context have a combined 16,000-character cap. Transcript batches are
+Metadata and context have a combined 24,000-character cap, accommodating the supplied
+Sessions 1–3 character history without truncation. Transcript batches are
 capped at 24,000 characters, with an explicit error for an oversized single line.
 No input is silently truncated. Multi-batch extraction preserves evidence IDs,
 then notes are recursively reduced into a final recap. A convergence cap stops
 runaway reduction. Provider responses must be completed and contain text.
+
+The user is a player. Public campaign premise and user-supplied prior-session history
+can establish context, not unseen adventure events or DM secrets. The supplied
+character notes are a secondary source with section references, not audio evidence.
+Do not manufacture segment IDs for them or treat old history as new recording events.
+
+## Runtime configuration
+
+Local cloud commands load only `OPENAI_API_KEY` and `RECAP_MODEL` from the root `.env`
+after the explicit cloud flag is checked. Process values win; `--model` wins over
+the configured recap model. Use `--env-file PATH` before the subcommand to select
+another file (relative to `--root`). No configuration is loaded by preparation/help.
+The parser handles simple quoted/unquoted values and comments without shell execution
+or interpolation. Configuration values are never included in parse errors.
+
+`config/codex-test.env` is safe to inspect and contains no usable key. Agent-run
+checks must select it or synthetic temporary configurations; do not inspect or load
+the real `.env` to confirm credentials. Creating this configuration does not grant
+access to secrets, and no paid call is part of setup validation.
 
 The cache key hashes the entire request, including prompt, context, model, and
 input. The final draft checks cited ID existence, but factual support, completeness,

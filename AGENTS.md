@@ -73,13 +73,26 @@ that repository, global settings, production services, or this project's scope.
   caches. Prefer additive schema changes; document migrations before breaking IDs.
 - Recheck official API documentation before changing model parameters, upload limits,
   or response formats. Sources and research dates belong in `docs/research.md`.
-- Do not read, print, commit, or auto-load secret files. Use `OPENAI_API_KEY` from the
-  process environment. Keep personal recordings and generated content ignored.
+- Never inspect, print, modify, or commit real `.env` files, credentials, or keys.
+  The user authorized the local CLI to load `.env` at runtime for cloud stages.
+  This does not authorize agents to inspect its contents. Tests use synthetic
+  values and `config/codex-test.env`, which contains setting names and placeholders
+  only, never secret values or references that resolve to real secrets. Use that
+  file explicitly for any agent-run CLI check; never execute the default secret
+  loader to validate credentials. Keep recordings and generated content ignored.
 - Do not run cloud stages unless processing is requested and cloud use is authorized.
   Keep the explicit CLI flag, disclose external processing, and never print provider
   bodies containing private data. Do not add automatic publishing or messaging.
 
 ## D&D grounding rules
+
+The user is a player, not the DM, in Icewind Dale: Rime of the Frostmaiden.
+`context/campaign/characters.md` is user-supplied historical context for Sessions
+1–3, including table-specific events. Preserve it. Public introductory setting
+material may supply the campaign premise only; do not read DM chapters, solutions,
+future encounters, hidden identities, or NPC motives to enrich player context.
+Table history takes precedence over published adventure canon. Do not invent
+audio citations for historical notes or narrate old events as new-session events.
 
 - Source priority: explicit human corrections/retcons with references, then source
   audio, then raw transcript, then derived notes. Campaign context resolves names

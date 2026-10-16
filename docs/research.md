@@ -53,3 +53,15 @@ the sources, not claims that a source prescribes this software architecture.
 
 No pricing is hard-coded. No assumptions are made about the group's edition,
 published setting, session length, number of players, or recording method.
+
+## Campaign setup, 2026-10-16
+
+The user subsequently confirmed Icewind Dale: Rime of the Frostmaiden and that they
+are a player. The actual table rules revision remains unknown. Use only the public
+premise from [D&D Beyond's introduction](https://www.dndbeyond.com/posts/834-what-are-ten-towns-the-frostmaiden)
+and the Icewind Dale setting/premise sections in
+[Running Winter Adventures](https://www.dndbeyond.com/posts/1886-running-winter-adventures-in-d-d).
+No encounter descriptions, stat blocks, future plot, or DM solutions were adopted.
+Table-specific names and Sessions 1–3 events come from the user's `characters.md`,
+not the published adventure. Its cited full recap has not been supplied separately.
+Keep that secondary-source history distinct from future audio-backed session facts.
