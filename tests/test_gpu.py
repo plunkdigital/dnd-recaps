@@ -45,6 +45,7 @@ class GpuTests(unittest.TestCase):
         whisper = Mock()
         whisper.WhisperModel.return_value.model.device = "cuda"
         with patch.object(gpu, "cuda_runtime", return_value={"device": "cuda:0"}), \
+                patch.object(gpu, "check_decoder"), \
                 patch.dict(sys.modules, {"faster_whisper": whisper}), contextlib.redirect_stdout(io.StringIO()):
             gpu.create_model("turbo", self.root / "models")
             kwargs = whisper.WhisperModel.call_args.kwargs
@@ -53,6 +54,29 @@ class GpuTests(unittest.TestCase):
             whisper.WhisperModel.return_value.model.device = "cpu"
             with self.assertRaises(ValueError):
                 gpu.create_model("turbo", self.root / "models")
+
+    def test_decoder_check_sanitizes_incompatible_pyav_before_model_download(self):
+        decoder = Mock(side_effect=TypeError("private decoder detail"))
+        whisper = Mock()
+        with patch.object(gpu, "cuda_runtime", return_value={"device": "cuda:0"}), \
+                patch.dict(sys.modules, {"faster_whisper": whisper,
+                                        "faster_whisper.audio": SimpleNamespace(decode_audio=decoder)}):
+            with self.assertRaisesRegex(ValueError, "PyAV below 19") as error:
+                gpu.create_model("turbo", self.root / "models")
+        self.assertNotIn("private decoder detail", str(error.exception))
+        whisper.WhisperModel.assert_not_called()
+
+    def test_backend_typeerror_does_not_save_partial_chunk_or_leak_details(self):
+        def fail_after_segment():
+            yield self.segment()
+            raise TypeError("private backend detail")
+        engine = Mock()
+        engine.transcribe.return_value = (fail_after_segment(), SimpleNamespace(language="en"))
+        with patch.object(gpu, "create_model", return_value=engine), contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaisesRegex(ValueError, "No partial chunk saved") as error:
+                gpu.transcribe(self.dest)
+        self.assertNotIn("private backend detail", str(error.exception))
+        self.assertFalse((self.dest / "transcripts/cuda/raw/c0000.json").exists())
 
     def test_local_cache_offsets_unknown_speakers_and_cloud_isolation(self):
         cloud = self.dest / "transcripts/raw/c0000.json"

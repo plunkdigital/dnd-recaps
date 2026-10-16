@@ -54,6 +54,16 @@ the sources, not claims that a source prescribes this software architecture.
 No pricing is hard-coded. No assumptions are made about the group's edition,
 published setting, session length, number of players, or recording method.
 
+## Local ASR decoder compatibility, 2026-10-16
+
+The installed faster-whisper 1.2.1 decoder passes `metadata_errors="ignore"` into
+`av.open`. [Its declared dependencies](https://github.com/SYSTRAN/faster-whisper/blob/v1.2.1/requirements.txt)
+allow PyAV 11 and above without an upper bound. [PyAV 19's documented API](https://pyav.basswood.io/docs/stable/api/_globals.html)
+no longer lists that argument. A local synthetic WAV reproduced TypeError with
+PyAV 19.0.1; the same decoder succeeded with 18.0.0, including synthetic silence VAD.
+Constrain the optional CUDA extra to `av>=18,<19` and pin 18.0.0 in both lockfiles.
+This verifies the decoding path, not actual GPU inference or transcript quality.
+
 ## Campaign setup, 2026-10-16
 
 The user subsequently confirmed Icewind Dale: Rime of the Frostmaiden and that they

@@ -5,6 +5,15 @@ belongs in `context/campaign/state.md`; keep those two kinds of state separate.
 
 ## Current phase
 
+Latest repair: user terminal confirms CUDA discovery and Community-1 access/CUDA
+initialization. First ASR chunk failed before completion because PyAV 19.0.1 rejects
+faster-whisper 1.2.1's `metadata_errors` keyword. Reproduced using synthetic audio;
+installed and pinned PyAV 18.0.0, added a decoder preflight and sanitized backend
+TypeError handling. All 52 offline tests, actual synthetic decoding/VAD, and package
+compatibility checks pass. Real ASR inference remains unverified. Retry only the
+first transcription stage before unattended recaps; the manual-check deliverable
+below still needs CLI implementation. See [repair checklist](GPU_DECODER_FIX_PLAN.md).
+
 Latest requirement: omit clearly unrelated table conversation from recaps. Topics
 whose campaign relevance is unclear stay out of drafts pending review and belong
 in each session's `manual-check.md`, with source IDs, timestamps, questions, and
@@ -91,14 +100,15 @@ See [DM and inbox checklist](DM_AND_INBOX_PLAN.md) and
 
 ## Immediate next step and remaining setup
 
-The local operator must accept the Community-1 model conditions and add `HF_TOKEN`
-to the ignored `.env`, as documented in the linked setup guide. Then run:
+The user's output confirms model access and CUDA initialization now succeed.
+After the decoder repair, retry the first ASR stage locally:
 
 ```bash
-./scripts/gpu_python.sh -m dnd_recaps gpu-check
-./scripts/gpu_python.sh -m dnd_recaps diarization-check
-./scripts/generate_recaps_gpu.sh --allow-cloud
+./scripts/gpu_python.sh -m dnd_recaps transcribe session-001-spice-bag --backend cuda
 ```
+
+Resume the full batch after verifying that inference works and implementing the
+required separate manual-check output. No agent credentials were loaded.
 
 The batch now runs local ASR, full-recording local diarization, and cloud text recaps
 in separate `cuda-diarized/` directories. The neural models require CUDA; decoding

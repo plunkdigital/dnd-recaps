@@ -59,6 +59,24 @@ results remain reusable. An in-flight cloud request may complete after its calle
 
 ## Environment and verification
 
+### First-chunk decoder failure fixed on 2026-10-16
+
+The user verified one CUDA device and Community-1 model access/initialization, then
+ASR failed on `c0000` with a generic malformed-input message. Synthetic audio
+reproduced the cause without any recording: faster-whisper 1.2.1 passes
+`metadata_errors` to `av.open`, but PyAV 19.0.1 rejects that keyword. The installed
+decoder and both lockfiles now pin PyAV 18.0.0; the CUDA extra constrains it below 19.
+A synthetic decoder preflight now runs before ASR model loading. Backend TypeError
+also gets a stage-specific message without exposing private exception contents.
+All 52 offline tests pass, actual synthetic decoding and VAD pass, and no real ASR
+inference was performed by the agent. Existing completed caches are preserved.
+
+Retry the first recording with the transcription-only command above. A public
+Whisper download may warn about anonymous Hugging Face access: local ASR does not
+load `.env`, whereas diarization loads only `HF_TOKEN`. This warning did not cause
+the decoder failure. Separate manual-check file generation remains pending, as
+recorded in [current state](PROJECT_STATE.md), before unattended recap delivery.
+
 Installed and import-checked on Python 3.14.4: faster-whisper 1.2.1, CTranslate2
 4.8.3, cuBLAS 12.8.4.1, and cuDNN 9.19.0.56. The resolved Linux/Python 3.14 pins
 are in `requirements-cuda.lock`. To reproduce on that platform:

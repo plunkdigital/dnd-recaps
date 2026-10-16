@@ -1,7 +1,9 @@
 anyio==4.15.1
     # via httpx2
-av==19.0.1
-    # via faster-whisper
+av==18.0.0
+    # via
+    #   dnd-recaps (pyproject.toml)
+    #   faster-whisper
 click==8.5.0
     # via huggingface-hub
 ctranslate2==4.8.3

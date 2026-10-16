@@ -3,6 +3,27 @@
 from importlib.metadata import version
 import math
 import time
+import tempfile
+import wave
+
+
+def check_decoder():
+    """Exercise the actual ASR decoder with synthetic silence before loading weights."""
+    try:
+        from faster_whisper.audio import decode_audio
+        with tempfile.TemporaryDirectory() as directory:
+            from pathlib import Path
+            path = Path(directory) / "decoder-check.wav"
+            with wave.open(str(path), "wb") as audio:
+                audio.setparams((1, 2, 16000, 0, "NONE", "not compressed"))
+                audio.writeframes(bytes(3200))
+            decoded = decode_audio(str(path))
+            if len(decoded) != 1600:
+                raise ValueError("Unexpected synthetic decode length.")
+    except (ImportError, OSError, RuntimeError, TypeError, ValueError):
+        raise ValueError("ASR audio decoder check failed. Install requirements-gpu-diarization.lock "
+                         "in this repository's .venv; faster-whisper 1.2.1 requires PyAV below 19. "
+                         "No recording was transcribed.") from None
 
 
 def cuda_runtime():
@@ -25,6 +46,7 @@ def cuda_runtime():
 
 def create_model(model_name, download_root):
     status = cuda_runtime()  # Check hardware before downloading model weights.
+    check_decoder()
     try:
         from faster_whisper import WhisperModel
         model = WhisperModel(model_name, device="cuda", device_index=0,
@@ -82,6 +104,9 @@ def transcribe(dest, model_name="turbo"):
                                     "speaker": "unknown", "words": words})
             except (RuntimeError, OSError):
                 raise ValueError("GPU transcription failed. Completed chunks remain cached. No CPU fallback; check memory and CUDA libraries.") from None
+            except TypeError:
+                raise ValueError("GPU transcription backend raised TypeError. Check the ASR decoder/package compatibility "
+                                 "against requirements-gpu-diarization.lock. No partial chunk saved; completed caches remain.") from None
             raw = {"segments": records, "no_speech": not records,
                    "language": info.language, "device": "cuda:0", "speaker_labels": False,
                    "elapsed_seconds": round(time.monotonic() - start, 2)}

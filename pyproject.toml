@@ -12,6 +12,7 @@ dependencies = []
 [project.optional-dependencies]
 cuda = [
   "faster-whisper>=1.2,<2",
+  "av>=18,<19",  # faster-whisper 1.2.1 uses metadata_errors, removed in PyAV 19.
   "ctranslate2>=4.8,<5",
   "nvidia-cublas-cu12; platform_system == 'Linux'",
   "nvidia-cudnn-cu12>=9,<10; platform_system == 'Linux'",
