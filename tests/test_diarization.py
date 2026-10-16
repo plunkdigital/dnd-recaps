@@ -139,6 +139,42 @@ class LocalPipelineTests(unittest.TestCase):
         self.assertFalse((self.dest / "transcripts/cuda-diarized/transcript.json").exists())
         self.assertEqual(list((self.dest / "transcripts/cuda-diarized/turns").glob("*.json")), [])
 
+    def test_embedding_windows_receive_preloaded_waveform_instead_of_file(self):
+        waveform = object()
+        reader = Mock(return_value=(waveform, 16000))
+        audio_factory = Mock(return_value=reader)
+        annotation = Mock()
+        annotation.itertracks.return_value = [(SimpleNamespace(start=0, end=3), None, "SPEAKER_00")]
+        pipeline = Mock(return_value=SimpleNamespace(speaker_diarization=annotation,
+                                                    speaker_embeddings=None))
+        hook = Mock()
+        hook.__enter__ = Mock(return_value="synthetic-hook")
+        hook.__exit__ = Mock(return_value=False)
+        with patch.object(diarization.subprocess, "run", return_value=SimpleNamespace(returncode=0)), \
+                patch.dict(sys.modules, {
+                    "pyannote.audio.core.io": SimpleNamespace(Audio=audio_factory),
+                    "pyannote.audio.pipelines.utils.hook": SimpleNamespace(ProgressHook=lambda: hook)}), \
+                contextlib.redirect_stdout(io.StringIO()):
+            result = diarization.run_turns(pipeline, self.dest / "audio/original.wav", self.dest, 4)
+        audio_factory.assert_called_once_with(sample_rate=16000, mono="downmix")
+        reader.assert_called_once()
+        pipeline.assert_called_once_with({"waveform": waveform, "sample_rate": 16000},
+                                         hook="synthetic-hook", num_speakers=4)
+        self.assertEqual(result["turns"], [{"start": 0, "end": 3, "speaker": "SPEAKER_00"}])
+        self.assertEqual(result["embeddings"], {})
+
+    def test_preload_failure_does_not_run_pipeline_or_expose_decoder_details(self):
+        pipeline = Mock()
+        audio_factory = Mock(return_value=Mock(side_effect=RuntimeError("private decoder detail")))
+        with patch.object(diarization.subprocess, "run", return_value=SimpleNamespace(returncode=0)), \
+                patch.dict(sys.modules, {
+                    "pyannote.audio.core.io": SimpleNamespace(Audio=audio_factory),
+                    "pyannote.audio.pipelines.utils.hook": SimpleNamespace(ProgressHook=Mock())}):
+            with self.assertRaises(ValueError) as error:
+                diarization.run_turns(pipeline, self.dest / "audio/original.wav", self.dest)
+        self.assertNotIn("private decoder detail", str(error.exception))
+        pipeline.assert_not_called()
+
     def test_diarize_cli_loads_only_hf_setting_and_never_calls_cloud(self):
         config = self.root / "synthetic-config.env"
         config.write_text("HF_TOKEN=synthetic-only\nOPENAI_API_KEY=must-not-import\n", encoding="utf-8")

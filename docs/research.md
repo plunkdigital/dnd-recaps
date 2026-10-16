@@ -83,3 +83,15 @@ decode all earlier audio again. [FFmpeg's official documentation](https://ffmpeg
 explains that default accurate seeking discards the earlier seek-point samples
 during transcoding. Chunk offsets and five-second overlap remain unchanged. A
 synthetic silence-then-tone regression checks nonzero seeking and the excerpt duration.
+
+## Diarization embedding IO, 2026-10-16
+
+Inspected installed pyannote.audio 4.0.7 and cached Community-1 configuration.
+The model config sets both batch sizes to 32, overriding the constructor's defaults.
+The official [embedding loop](https://github.com/pyannote/pyannote-audio/blob/main/src/pyannote/audio/pipelines/speaker_diarization.py)
+crops overlapping windows. In the [audio reader](https://github.com/pyannote/pyannote-audio/blob/main/src/pyannote/audio/core/io.py),
+file-based crops construct TorchCodec decoders repeatedly, whereas waveform-based
+crops slice a tensor. Preloading is a plausible remedy for IO overhead; its real
+effect on GPU embedding throughput has not been measured. Synthetic tests confirmed
+identical sample crops with 100 decoder opens reduced to one. Keep TF32 disabled
+and model/overlap settings unchanged until there is evidence for a quality tradeoff.

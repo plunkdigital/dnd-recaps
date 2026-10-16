@@ -5,6 +5,16 @@ belongs in `context/campaign/state.md`; keep those two kinds of state separate.
 
 ## Current phase
 
+Latest user run confirms real first-recording GPU ASR now completes all 13 chunks
+in about 323 seconds. Diarization segmentation took 12 seconds; embeddings showed
+42 percent and `0:16:29`, prompting performance review. Community-1 already uses
+batch size 32. The wrapper now preloads mono audio in RAM once to avoid per-window
+decoder creation. A synthetic crop check preserved every sample and reduced decoder
+opens from 100 to one; all 54 offline tests passed. Real embedding speedup remains
+unmeasured. The active process was left alone; later session processes pick up the
+change. See [embedding performance checklist](DIARIZATION_SPEED_PLAN.md) and
+[running-job guidance](local-diarization.md#embedding-performance).
+
 Latest repair: user terminal confirms CUDA discovery and Community-1 access/CUDA
 initialization. First ASR chunk failed before completion because PyAV 19.0.1 rejects
 faster-whisper 1.2.1's `metadata_errors` keyword. Reproduced using synthetic audio;
@@ -99,6 +109,12 @@ See [DM and inbox checklist](DM_AND_INBOX_PLAN.md) and
   preparation was regenerated and verified. Remaining cloud checks are outstanding.
 
 ## Immediate next step and remaining setup
+
+Let the user's active diarization finish; do not run another writer for that session.
+Subsequent session processes use preloaded waveform input automatically. The first
+ASR stage is now verified by user output, so the earlier retry note below is historical.
+Check real embedding timings and speaker output quality after completion. The
+manual-check file-generation requirement remains pending implementation.
 
 The user's output confirms model access and CUDA initialization now succeed.
 After the decoder repair, retry the first ASR stage locally:

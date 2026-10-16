@@ -33,6 +33,33 @@ these credential-dependent operations in this runtime.
 
 ## Speaker turns and text
 
+### Embedding performance
+
+The cached Community-1 configuration already uses embedding batch size 32. Our
+wrapper now loads the temporary mono/16 kHz audio into a CPU waveform once before
+calling the pipeline. Pyannote then slices this waveform for embedding windows,
+instead of repeatedly constructing file decoders. Neural models still use CUDA;
+model parameters, overlap handling, and TF32 policy are unchanged. Waveform storage
+needs about 0.215 GiB of RAM per hour (about 0.905 GiB for the first recording), plus
+decoder, segmentation, and inference overhead. This is system RAM, not all VRAM.
+
+Using the installed reader, 100 synthetic crops gave identical samples and reduced
+decoder constructions from 100 to one. Crop times were 0.723 seconds versus 0.050
+seconds including preload. These numbers measure synthetic audio IO only; no
+real-recording embedding speedup or speaker-quality improvement is established.
+All 54 offline tests pass, including waveform delivery and safe preload failure.
+See the [performance checklist](DIARIZATION_SPEED_PLAN.md).
+
+An already-running diarization process retains its original code. Later session
+processes in the shell batch load the updated wrapper automatically. Let the active
+session finish to retain its work. Stopping it discards in-progress diarization,
+because speaker turns are cached only when the complete recording succeeds; ASR
+chunks stay reusable. Do not launch another writer for the same session. Completed
+turn caches remain reusable with this IO change and are not forcibly recomputed.
+The separate manual-check output requirement remains pending CLI implementation.
+
+### Alignment and evidence
+
 Diarization runs across each full source recording, not separately per upload chunk.
 It therefore produces consistent **session-local** labels such as `session:SPEAKER_00`.
 Whisper's word timestamps align those turns to speech. A source segment can render

@@ -136,9 +136,15 @@ def run_turns(pipeline, source, directory, num_speakers=None):
             raise ValueError("Could not decode audio for diarization; original remains unchanged.")
         options = {"num_speakers": num_speakers} if num_speakers else {}
         try:
+            from pyannote.audio.core.io import Audio
             from pyannote.audio.pipelines.utils.hook import ProgressHook
+            # File-based Audio.crop constructs a decoder per embedding window.
+            # Decode once into host RAM so overlapping windows use tensor slices.
+            waveform, sample_rate = Audio(sample_rate=16000, mono="downmix")(str(audio))
+            print("Diarization audio preloaded in RAM; embedding windows reuse the waveform.", flush=True)
             with ProgressHook() as hook:
-                output = pipeline(str(audio), hook=hook, **options)
+                output = pipeline({"waveform": waveform, "sample_rate": sample_rate},
+                                  hook=hook, **options)
             turns = [{"start": turn.start, "end": turn.end, "speaker": label}
                      for turn, _, label in output.speaker_diarization.itertracks(yield_label=True)]
             from .voice_matching import unit_vector
