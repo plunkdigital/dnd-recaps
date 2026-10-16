@@ -185,6 +185,24 @@ No GPU transcription or diarization needs repeating to generate these review fil
 
 ### Narrative output limits
 
+Narrative requests now use a code-owned citation transport. The source's exact
+canonical IDs map to short request-local handles such as `[E1]`. The model returns
+JSON text blocks containing `markdown` and an `evidence` array of integers. Code
+checks each reference against that request's mapping and appends canonical
+`[cNNNN:sNNNN]` citations. It rejects strings, ranges, booleans, duplicates, unknown
+numbers, and inline markers/IDs in block prose. Factual blocks require references;
+headings and explicit `Not established` placeholders may be uncited. Strictly valid
+legacy Markdown with canonical citations can still pass the existing validator.
+
+The mapping's hash enters the request instructions, preventing cached numeric
+references from being rebound to different source IDs. Raw JSON responses stay
+unchanged in caches; rendered Markdown carries canonical citations into subsequent
+reduction steps and final drafts. Numbers have meaning only inside one request.
+This is an application-level JSON text contract; API parameters/formats are unchanged.
+Old narrative caches remain preserved but new narrative requests have new identities.
+Relevance extraction cache identities remain unchanged. Citation checks establish
+reference validity, not whether each claim is supported; human review still applies.
+
 The request cap remains 5,000 output tokens, with the existing model and API
 parameters unchanged. Non-final note reduction now asks for compact notes with
 minimal supporting citations rather than exhaustive repeated ID lists. This changes

@@ -99,6 +99,15 @@ synthetic silence-then-tone regression checks nonzero seeking and the excerpt du
 
 ## Diarization embedding IO, 2026-10-16
 
+The user's overnight run also reports TF32 reproducibility and pooling sample-count
+warnings. Inspected the installed pyannote 4.0.7 reproducibility guard, the official
+[pooling implementation](https://github.com/pyannote/pyannote-audio/blob/main/src/pyannote/audio/models/blocks/pooling.py),
+and installed clustering filters. The guard disables TF32; unbiased standard
+deviation needs sufficient samples. A warning alone does not identify which source
+window was affected or establish a failed result. Clustering filters NaN embeddings;
+the repository's `unit_vector` rejects non-finite final profiles. Leave precision
+and pooling math unchanged, retain warnings, and review completed outputs.
+
 Inspected installed pyannote.audio 4.0.7 and cached Community-1 configuration.
 The model config sets both batch sizes to 32, overriding the constructor's defaults.
 The official [embedding loop](https://github.com/pyannote/pyannote-audio/blob/main/src/pyannote/audio/pipelines/speaker_diarization.py)

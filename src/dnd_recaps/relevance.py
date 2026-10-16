@@ -41,35 +41,84 @@ def valid_citations(text, allowed):
     return re.search(r"\bc\d+\s*:\s*s\d+\b|\[\s*s\d+\b", remaining) is None
 
 
+def citation_transport(instructions, source):
+    ids = sorted(citations(source))
+    mapping = {index: identity for index, identity in enumerate(ids, 1)}
+    numbers = {identity: index for index, identity in mapping.items()}
+    text = re.sub(r"\[(c\d+:s\d+)\]", lambda match: f"[E{numbers[match[1]]}]", source)
+    fingerprint = hashlib.sha256(json.dumps(mapping, sort_keys=True).encode()).hexdigest()
+    contract = ("\nNarrative evidence blocks v1. Return ONLY a JSON object, without code fences: "
+                '{"blocks":[{"markdown":"Heading or prose", "evidence":[1,2]}]}. '
+                "Evidence numbers are examples only. Use only numeric evidence handles [E<number>] "
+                "actually present in this input. This overrides literal citation formatting in earlier instructions: "
+                "put integer reference numbers in evidence arrays, never in prose. Code writes canonical citations. "
+                "Never use ranges, shorthand, strings, or invented reference numbers. "
+                "Write the requested story sections or compact notes in markdown blocks. "
+                "Each factual block needs its supporting evidence numbers; headings can have empty arrays. "
+                "Do not put source IDs or [E<number>] markers in markdown. "
+                "Evidence numbers are local to this request and must not be reused from another request. "
+                "Evidence mapping SHA-256: " + fingerprint)
+    return instructions + contract, text, mapping
+
+
+def render_evidence_blocks(output, mapping):
+    try:
+        data = json.loads(output)
+    except ValueError:
+        # Backward-compatible acceptance still requires strict canonical IDs.
+        return output if valid_citations(output, set(mapping.values())) else None
+    try:
+        blocks = data["blocks"]
+        if not isinstance(blocks, list) or not blocks:
+            return None
+        rendered = []
+        for block in blocks:
+            text, refs = block["markdown"], block["evidence"]
+            if (not isinstance(text, str) or not text.strip() or not isinstance(refs, list)
+                    or any(type(ref) is not int or ref not in mapping for ref in refs)
+                    or len(refs) != len(set(refs))
+                    or re.search(r"\bc\d+\s*:\s*s\d+\b|\[E\d+\]", text)):
+                return None
+            if not refs and not all(re.fullmatch(r"#{1,6}\s+.+|Not established\.?", line.strip())
+                                    for line in text.splitlines() if line.strip()):
+                return None
+            rendered.append(text.strip() + (" " + " ".join(f"[{mapping[ref]}]" for ref in refs) if refs else ""))
+        result = "\n\n".join(rendered)
+        return result if valid_citations(result, set(mapping.values())) else None
+    except (KeyError, TypeError):
+        return None
+
+
 def generate_cited(instructions, source, model, cache, stage, recovery=None):
     from .cli import generate, SummaryOutputLimit
 
     if recovery is None:
         recovery = {"splits": 0}
-    allowed = citations(source)
+    transported, text, mapping = citation_transport(instructions, source)
     try:
-        output = generate(instructions, source, model, cache)
+        output = generate(transported, text, model, cache)
     except SummaryOutputLimit:
         return reduce_after_cutoff(instructions, source, model, cache, stage, recovery)
-    if valid_citations(output, allowed):
-        return output
+    rendered = render_evidence_blocks(output, mapping)
+    if rendered is not None:
+        return rendered
     print(f"Citation validation failed during {stage}; regenerating once from supplied evidence.", flush=True)
     # The invalid draft is deliberately not used as evidence or fed back into the
     # rewrite. Reconstruct from the same validated input; never guess replacements.
-    repair = ("\nCitation recovery attempt 1. The previous response failed citation validation. "
-              "Rewrite from the supplied source evidence only. Cite significant claims with exact individual "
-              "[cNNNN:sNNNN] IDs copied from the source. Never use ranges, shorthand, bare IDs, "
-              "comma-separated IDs inside one bracket pair, or invented IDs. "
-              "If evidence cannot support a claim, omit it. Do not substitute a nearby ID. "
-              "The permitted IDs are: " + json.dumps(sorted(allowed)))
+    repair = ("\nCitation recovery attempt 1. The previous response failed evidence-block validation. "
+              "Rewrite from the supplied evidence only using the JSON blocks contract. "
+              "Put supporting integer evidence numbers in each block's evidence array. "
+              "Do not put citations or evidence handles in prose, and never invent or expand ranges. "
+              "If evidence cannot support a claim, omit it. The permitted numbers are: " + json.dumps(list(mapping)))
     try:
-        output = generate(instructions + repair, source, model, cache)
+        output = generate(transported + repair, text, model, cache)
     except SummaryOutputLimit:
         return reduce_after_cutoff(instructions, source, model, cache, stage, recovery)
-    if not valid_citations(output, allowed):
+    rendered = render_evidence_blocks(output, mapping)
+    if rendered is None:
         raise ValueError(f"Citation validation failed during {stage}, including one recovery attempt. "
                          "No new recap/review pair published. Original responses and completed audio stages remain cached.")
-    return output
+    return rendered
 
 
 def reduce_after_cutoff(instructions, source, model, cache, stage, recovery):

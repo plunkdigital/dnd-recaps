@@ -172,8 +172,9 @@ class PipelineTests(unittest.TestCase):
                 return response(json.dumps({"items": [{"source_ids": [i], "category": "campaign",
                                                        "note": "x" * 1000} for i in ids]}))
             if "partial session" in data["instructions"]:
-                from dnd_recaps.relevance import citations
-                return response("Evidence notes " + " ".join(f"[{i}]" for i in sorted(citations(data["input"]))))
+                import re
+                numbers = sorted({int(n) for n in re.findall(r"\[E(\d+)\]", data["input"])})
+                return response(json.dumps({"blocks": [{"markdown": "Evidence notes", "evidence": numbers}]}))
             return response("# Session recap\nA tale [c0000:s0000]")
         with patch.object(cli, "api", side_effect=fake_api) as api, contextlib.redirect_stdout(io.StringIO()):
             cli.summarize(self.root, self.dest, "test-model")

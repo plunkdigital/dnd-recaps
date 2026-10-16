@@ -107,6 +107,17 @@ index. See [manual checks and summary-only reruns](workflow.md#campaign-relevanc
 
 ### Alignment and evidence
 
+The TF32 reproducibility warning reports that pyannote disabled reduced-precision
+CUDA math. It is not a CPU fallback or failure; keep the current precision policy.
+A pooling `std(): degrees of freedom` warning indicates too few samples for that
+standard-deviation calculation. The warning does not identify whether a real source
+window was affected and does not by itself mean the stage failed. Pyannote filters
+NaN embeddings before clustering; this repository also rejects non-finite final
+voice vectors. Affected samples cannot serve as trusted voice profiles. Do not
+suppress warnings or alter library pooling math to make a run appear successful.
+Check stage exit status, usable speaker turns, and speaker quality before accepting
+results. Leave the existing overnight job running unless it actually fails.
+
 Diarization runs across each full source recording, not separately per upload chunk.
 It therefore produces consistent **session-local** labels such as `session:SPEAKER_00`.
 Whisper's word timestamps align those turns to speech. A source segment can render

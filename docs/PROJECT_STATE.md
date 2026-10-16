@@ -5,6 +5,22 @@ belongs in `context/campaign/state.md`; keep those two kinds of state separate.
 
 ## Current phase
 
+The latest partial-reduction response and its citation rewrite still used ranges.
+Narrative requests now use request-local numeric evidence handles and JSON text
+blocks; code validates reference arrays and renders exact canonical IDs. Mapping
+hashes prevent cache reuse with a different ID binding. Strict legacy citations can
+still pass validation; ranges and invented IDs cannot. All 100 offline tests pass,
+including JSON rendering, invalid references, cache identity, and cutoff recovery.
+Read-only replay confirms all 74 relevance caches remain reusable; only narrative
+requests change. No live provider calls or credentials were used. See
+[citation rendering checklist](CITATION_RENDERING_PLAN.md).
+
+The user also reports TF32 and pooling `std()` warnings during Session 2's overnight
+diarization. Installed code confirms TF32 is disabled, clustering filters NaNs, and
+voice-profile normalization rejects non-finite vectors. No precision/pooling changes
+or warning suppression were made. A warning is not by itself a failed stage or a
+quality guarantee; keep the overnight job running and inspect actual stage results.
+
 Session 1 completed all 74 relevance batches, then the older adapter reported an
 incomplete response at note reduction. Its reason was not retained and cannot be
 confirmed. The adapter now saves incomplete responses as separate diagnostics and

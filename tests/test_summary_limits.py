@@ -1,6 +1,7 @@
 import contextlib
 import io
 import json
+import re
 from pathlib import Path
 import tempfile
 import unittest
@@ -36,11 +37,11 @@ class SummaryLimitTests(unittest.TestCase):
     def test_split_reduce_recombine_never_uses_partial_text_and_caches_all_work(self):
         def reply(endpoint, body):
             data = json.loads(body)
-            if data["input"] == self.source:
+            if data["input"] == relevance.citation_transport("", self.source)[1]:
                 return cutoff()
-            first = sorted(relevance.citations(data["input"]))[0]
+            first = min(int(n) for n in re.findall(r"\[E(\d+)\]", data["input"]))
             prefix = "Compact evidence" if "Output-limit recovery v1" in data["instructions"] else "Final story"
-            return response(f"{prefix} [{first}]")
+            return response(json.dumps({"blocks": [{"markdown": prefix, "evidence": [first]}]}))
         with patch.object(cli, "api", side_effect=reply) as api, contextlib.redirect_stdout(io.StringIO()):
             result = relevance.generate_cited("Write", self.source, "fixture", self.cache, "final recap")
             again = relevance.generate_cited("Write", self.source, "fixture", self.cache, "final recap")
@@ -88,10 +89,10 @@ class SummaryLimitTests(unittest.TestCase):
     def test_cutoff_during_citation_repair_also_uses_bounded_split(self):
         def reply(endpoint, body):
             data = json.loads(body)
-            if data["input"] == self.source:
+            if data["input"] == relevance.citation_transport("", self.source)[1]:
                 return cutoff() if "Citation recovery attempt 1" in data["instructions"] else response("No citations")
-            first = sorted(relevance.citations(data["input"]))[0]
-            return response(f"Grounded result [{first}]")
+            first = min(int(n) for n in re.findall(r"\[E(\d+)\]", data["input"]))
+            return response(json.dumps({"blocks": [{"markdown": "Grounded result", "evidence": [first]}]}))
         with patch.object(cli, "api", side_effect=reply) as api, contextlib.redirect_stdout(io.StringIO()):
             result = relevance.generate_cited("Write", self.source, "fixture", self.cache, "final recap")
         self.assertTrue(relevance.valid_citations(result, relevance.citations(self.source)))

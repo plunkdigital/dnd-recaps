@@ -38,7 +38,7 @@ class CitationRecoveryTests(unittest.TestCase):
             self.assertEqual(api.call_count, 2)
             self.assertEqual(len(list(cache.glob("*.json"))), 2)
             retry = json.loads(api.call_args_list[1].args[1])
-            self.assertEqual(retry["input"], source)
+            self.assertEqual(retry["input"], "Grounded evidence [E1] [E2]")
             self.assertNotIn("INVALID_DRAFT_SENTINEL", json.dumps(retry))
             self.assertIn("Citation recovery attempt 1", retry["instructions"])
 
