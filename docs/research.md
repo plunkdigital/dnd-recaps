@@ -56,6 +56,17 @@ published setting, session length, number of players, or recording method.
 
 ## Incomplete text responses, 2026-10-16
 
+Follow-up: narrative JSON was only requested through instructions, which allowed
+responses with missing evidence arrays and malformed JSON. Rechecked the official
+[Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses)
+and [GPT-4.1 mini features](https://developers.openai.com/api/docs/models/gpt-4.1-mini).
+Narrative calls now use `text.format: {type: json_schema, strict: true, ...}` with
+required fields and `additionalProperties: false` for every object. Numeric reference
+bounds and nonempty evidence arrays are included. Local validation still enforces
+reference membership and rendering rules; refusal and incomplete-response handling
+remain separate. This changes narrative payloads, not relevance payloads or model
+selection. No live compatibility test was possible under agent secret restrictions.
+
 Reviewed the official [OpenAI incomplete-response handling guide](https://developers.openai.com/api/docs/guides/reasoning#allocating-space-for-reasoning).
 The documented output-cutoff signal is `status: incomplete` with
 `incomplete_details.reason: max_output_tokens`. This is a response-status check,

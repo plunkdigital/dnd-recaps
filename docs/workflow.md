@@ -191,14 +191,23 @@ JSON text blocks containing `markdown` and an `evidence` array of integers. Code
 checks each reference against that request's mapping and appends canonical
 `[cNNNN:sNNNN]` citations. It rejects strings, ranges, booleans, duplicates, unknown
 numbers, and inline markers/IDs in block prose. Factual blocks require references;
-headings and explicit `Not established` placeholders may be uncited. Strictly valid
+headings and explicit `Not established` placeholders may be uncited in legacy rendering. Strictly valid
 legacy Markdown with canonical citations can still pass the existing validator.
 
 The mapping's hash enters the request instructions, preventing cached numeric
 references from being rebound to different source IDs. Raw JSON responses stay
 unchanged in caches; rendered Markdown carries canonical citations into subsequent
 reduction steps and final drafts. Numbers have meaning only inside one request.
-This is an application-level JSON text contract; API parameters/formats are unchanged.
+Narrative requests now also send Responses `text.format` with `type: json_schema`
+and `strict: true`. The schema requires `blocks`, `markdown` and `evidence`, rejects
+extra properties, and constrains evidence to nonempty arrays of integers between
+1 and the current mapping's size. New blocks combine headings with supported prose
+so every generated block can have supporting references. Local validation remains
+mandatory, including duplicate and inline-marker checks; schema adherence does not
+establish factual support. Provider refusals are preserved privately and stop the
+request without automatic retries or fallback to unconstrained text. Model support
+for Structured Outputs is required; GPT-4.1 mini supports it. Relevance requests
+keep their existing payload and cache identity.
 Old narrative caches remain preserved but new narrative requests have new identities.
 Relevance extraction cache identities remain unchanged. Citation checks establish
 reference validity, not whether each claim is supported; human review still applies.

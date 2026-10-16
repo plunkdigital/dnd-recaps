@@ -257,9 +257,11 @@ def batches(text, limit=24000):
     return result
 
 
-def generate(instructions, text, model, cache_dir):
+def generate(instructions, text, model, cache_dir, response_format=None):
     payload = {"model": model, "instructions": instructions, "input": text,
                "store": False, "max_output_tokens": 5000}
+    if response_format is not None:
+        payload["text"] = {"format": response_format}
     encoded = json.dumps(payload, ensure_ascii=False).encode()
     key = hashlib.sha256(encoded).hexdigest()
     cache = cache_dir / (key + ".json")
@@ -275,6 +277,10 @@ def generate(instructions, text, model, cache_dir):
         reason_label = "content_filter" if reason == "content_filter" else "not reported or not recoverable"
         raise ValueError(f"Summary response did not complete (reason: {reason_label}). "
                          "Diagnostic response preserved; no final recap was written.")
+    if any(part.get("type") == "refusal" for item in raw.get("output", [])
+           for part in item.get("content", [])):
+        save_json(incomplete, raw)
+        raise ValueError("Summary request was refused by the provider. Response preserved privately; no new draft published.")
     output = "\n".join(part["text"] for item in raw.get("output", [])
                        if item.get("type") == "message" for part in item.get("content", [])
                        if part.get("type") == "output_text")

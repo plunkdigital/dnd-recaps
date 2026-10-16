@@ -54,11 +54,28 @@ def citation_transport(instructions, source):
                 "put integer reference numbers in evidence arrays, never in prose. Code writes canonical citations. "
                 "Never use ranges, shorthand, strings, or invented reference numbers. "
                 "Write the requested story sections or compact notes in markdown blocks. "
-                "Each factual block needs its supporting evidence numbers; headings can have empty arrays. "
+                "Every block needs at least one supporting evidence number. "
+                "Combine headings with the following supported prose in the same block. "
                 "Do not put source IDs or [E<number>] markers in markdown. "
                 "Evidence numbers are local to this request and must not be reused from another request. "
                 "Evidence mapping SHA-256: " + fingerprint)
     return instructions + contract, text, mapping
+
+
+def narrative_response_format(mapping):
+    if not mapping:
+        raise ValueError("Narrative generation requires source evidence references.")
+    return {"type": "json_schema", "name": "narrative_evidence_blocks", "strict": True,
+            "schema": {"type": "object", "additionalProperties": False, "required": ["blocks"],
+                       "properties": {"blocks": {
+                           "type": "array", "minItems": 1,
+                           "items": {"type": "object", "additionalProperties": False,
+                                     "required": ["markdown", "evidence"],
+                                     "properties": {
+                                         "markdown": {"type": "string", "minLength": 1},
+                                         "evidence": {"type": "array", "minItems": 1,
+                                                      "items": {"type": "integer", "minimum": 1,
+                                                                "maximum": len(mapping)}}}}}}}}
 
 
 def render_evidence_blocks(output, mapping):
@@ -95,8 +112,9 @@ def generate_cited(instructions, source, model, cache, stage, recovery=None):
     if recovery is None:
         recovery = {"splits": 0}
     transported, text, mapping = citation_transport(instructions, source)
+    response_format = narrative_response_format(mapping)
     try:
-        output = generate(transported, text, model, cache)
+        output = generate(transported, text, model, cache, response_format=response_format)
     except SummaryOutputLimit:
         return reduce_after_cutoff(instructions, source, model, cache, stage, recovery)
     rendered = render_evidence_blocks(output, mapping)
@@ -111,7 +129,7 @@ def generate_cited(instructions, source, model, cache, stage, recovery=None):
               "Do not put citations or evidence handles in prose, and never invent or expand ranges. "
               "If evidence cannot support a claim, omit it. The permitted numbers are: " + json.dumps(list(mapping)))
     try:
-        output = generate(transported + repair, text, model, cache)
+        output = generate(transported + repair, text, model, cache, response_format=response_format)
     except SummaryOutputLimit:
         return reduce_after_cutoff(instructions, source, model, cache, stage, recovery)
     rendered = render_evidence_blocks(output, mapping)

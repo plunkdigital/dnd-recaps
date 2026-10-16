@@ -10,8 +10,10 @@ one rewrite. Narrative citation copying/formatting needs a code-owned boundary.
 
 No permissive range expansion, guessed IDs, discarded raw caches, live provider
 calls, secrets, or interference with the overnight runner. Preserve draft review
-boundaries. The API model, parameters and text response format are unchanged;
-the JSON block contract is validated application-level response text.
+boundaries. At this phase the API model, parameters and text response format were
+unchanged; the JSON block contract was application-level response text only.
+This proved insufficient in live output. The subsequent
+[strict output fix](STRICT_OUTPUT_PLAN.md) enforces the schema through Responses.
 
 Verified: all 100 offline tests pass. Numeric arrays reject invalid types, ranges,
 duplicates and unknown references; factual blocks cannot be uncited. The mapping

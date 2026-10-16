@@ -5,6 +5,18 @@ belongs in `context/campaign/state.md`; keep those two kinds of state separate.
 
 ## Current phase
 
+Latest narrative failure: one response omitted every evidence array; its rewrite
+was invalid JSON. Prompt-only formatting was insufficient. Narrative requests now
+enforce a strict Responses JSON schema requiring nonempty numeric evidence arrays
+bounded to the current mapping, with local validation retained. Provider refusals
+stop safely and are saved as private diagnostics. All 105 offline tests pass.
+Read-only replay confirmed all 74 actual relevance caches remain reusable and the
+first narrative request now includes the schema (718 possible references). Both
+invalid cached responses remain rejected; they were not modified or promoted.
+No live API call, credential access, or interruption of the overnight job occurred.
+Live end-to-end success is still unverified. See [strict output checklist](STRICT_OUTPUT_PLAN.md).
+Already-running summaries retain old code; later CLI processes use this change.
+
 The latest partial-reduction response and its citation rewrite still used ranges.
 Narrative requests now use request-local numeric evidence handles and JSON text
 blocks; code validates reference arrays and renders exact canonical IDs. Mapping
