@@ -41,11 +41,16 @@ def valid_citations(text, allowed):
     return re.search(r"\bc\d+\s*:\s*s\d+\b|\[\s*s\d+\b", remaining) is None
 
 
-def generate_cited(instructions, source, model, cache, stage):
-    from .cli import generate
+def generate_cited(instructions, source, model, cache, stage, recovery=None):
+    from .cli import generate, SummaryOutputLimit
 
+    if recovery is None:
+        recovery = {"splits": 0}
     allowed = citations(source)
-    output = generate(instructions, source, model, cache)
+    try:
+        output = generate(instructions, source, model, cache)
+    except SummaryOutputLimit:
+        return reduce_after_cutoff(instructions, source, model, cache, stage, recovery)
     if valid_citations(output, allowed):
         return output
     print(f"Citation validation failed during {stage}; regenerating once from supplied evidence.", flush=True)
@@ -57,11 +62,44 @@ def generate_cited(instructions, source, model, cache, stage):
               "comma-separated IDs inside one bracket pair, or invented IDs. "
               "If evidence cannot support a claim, omit it. Do not substitute a nearby ID. "
               "The permitted IDs are: " + json.dumps(sorted(allowed)))
-    output = generate(instructions + repair, source, model, cache)
+    try:
+        output = generate(instructions + repair, source, model, cache)
+    except SummaryOutputLimit:
+        return reduce_after_cutoff(instructions, source, model, cache, stage, recovery)
     if not valid_citations(output, allowed):
         raise ValueError(f"Citation validation failed during {stage}, including one recovery attempt. "
                          "No new recap/review pair published. Original responses and completed audio stages remain cached.")
     return output
+
+
+def reduce_after_cutoff(instructions, source, model, cache, stage, recovery):
+    """Bounded recovery using whole evidence lines, never the provider's partial text."""
+    lines = source.splitlines(keepends=True)
+    if recovery["splits"] >= 3 or len(lines) < 2:
+        raise ValueError(f"Output limit during {stage}; bounded recovery cannot split further. "
+                         "Diagnostic and completed responses remain cached. No new recap/review pair published.")
+    recovery["splits"] += 1
+    # Balance at a line boundary so each side retains its original citations.
+    cumulative = 0
+    boundaries = []
+    for index, line in enumerate(lines[:-1], 1):
+        cumulative += len(line)
+        boundaries.append((abs(len(source) / 2 - cumulative), index))
+    boundary = min(boundaries)[1]
+    parts = ["".join(lines[:boundary]), "".join(lines[boundary:])]
+    if any(not citations(part) for part in parts):
+        raise ValueError(f"Output limit during {stage}; cannot split evidence without losing source references. "
+                         "No new recap/review pair published.")
+    print(f"Output-token cutoff during {stage}; reducing two smaller evidence groups "
+          f"(split {recovery['splits']}/3).", flush=True)
+    compact = ("\nOutput-limit recovery v1. This input is partial session evidence. "
+               "Override story formatting for this step: produce compact chronological evidence notes only, "
+               "at most 600 words. Retain consequential outcomes, choices, clues, resources, uncertainties, "
+               "unresolved threads and stopping information present here. Cite only 1-3 exact supporting "
+               "IDs per finding, not a complete ID inventory. No invented events or final recap.")
+    reduced = [generate_cited(instructions + compact, part, model, cache, stage + " partial recovery", recovery)
+               for part in parts]
+    return generate_cited(instructions, "\n".join(reduced), model, cache, stage, recovery)
 
 
 def source_batches(segments, render, limit=8000):

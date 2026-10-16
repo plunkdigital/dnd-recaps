@@ -5,6 +5,21 @@ belongs in `context/campaign/state.md`; keep those two kinds of state separate.
 
 ## Current phase
 
+Session 1 completed all 74 relevance batches, then the older adapter reported an
+incomplete response at note reduction. Its reason was not retained and cannot be
+confirmed. The adapter now saves incomplete responses as separate diagnostics and
+recovers only explicitly reported output-token cutoffs, by splitting original
+validated narrative evidence and recombining completed cited notes. Recovery allows
+at most three splits per narrative request; no partial text becomes evidence.
+Non-final prompts request compact citation sets. All 93 offline tests pass. An
+offline replay confirmed all 74 Session 1 relevance cache identities are unchanged
+and reach reduction without API calls or writes. No provider call, credential load,
+or process interruption occurred. See [output-limit checklist](SUMMARY_LIMIT_PLAN.md).
+
+The user has already started the overnight runner. Leave it running; later summary
+processes pick up the new code, while any already-running summary retains old code.
+Use the batch status file to find failed sessions and rerun only their summaries.
+
 The user reports summarization is progressing and requested an overnight run from
 Session 2 onward. `scripts/generate_recaps_remaining_gpu.sh --allow-cloud` now runs
 sessions 2–6, continues after individual session failures, and logs stage outcomes

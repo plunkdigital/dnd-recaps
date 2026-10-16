@@ -150,15 +150,16 @@ with `classification_issues` in the generated review JSON, not treated as valid
 campaign evidence. All returned/augmented items still pass strict source-ID coverage
 validation before use. Reports explicitly disclose partial or invalid model
 classification. No additional request is made just to repair relevance classification.
-Incomplete provider responses, network failures, and invalid narrative citations
-still stop publication.
+Incomplete provider responses never become successful evidence or drafts. A
+narrative response explicitly cut off by its output-token limit can use the bounded
+recovery described below; other incomplete responses and network failures stop.
 Invalid narrative citations get at most one cached regeneration from the same
 validated evidence before stopping. The invalid draft is not fed back as evidence.
 Each ID must have its own brackets; ranges, shorthand, bare references, and grouped
 IDs are rejected even when the same response contains a valid citation. No range
 expansion, guessed ID replacement, or validation bypass is performed. Recovery is
 an additional paid text request when its response is not already cached; network
-errors and incomplete provider responses do not trigger this recovery path.
+errors and incomplete provider responses do not trigger citation-format recovery.
 All-unrelated or all-uncertain inputs produce a short no-established-events draft
 and the completed review report rather than an invented story. A valid ID does not
 prove factual support, nor can code ensure every off-topic remark was detected.
@@ -181,6 +182,42 @@ finish and then rerun only that session's summary after it has no active writer:
 
 Subsequent summary processes in the existing shell batch pick up the new workflow.
 No GPU transcription or diarization needs repeating to generate these review files.
+
+### Narrative output limits
+
+The request cap remains 5,000 output tokens, with the existing model and API
+parameters unchanged. Non-final note reduction now asks for compact notes with
+minimal supporting citations rather than exhaustive repeated ID lists. This changes
+only narrative reduction requests; existing relevance extraction caches still match.
+
+Responses whose status is not completed are preserved under that backend's
+`summaries/.../cache/incomplete/<request-hash>.json`, separate from completed cache
+entries. These files are private diagnostics, never usable notes or recaps. The
+adapter recognizes only `status: incomplete` with
+`incomplete_details.reason: max_output_tokens` as a recoverable output cutoff.
+It reports a safe reason rather than printing private response text. Other reasons,
+missing reasons, failed responses, and network errors still stop the stage.
+
+For an explicit narrative cutoff, split the original validated evidence at a whole
+line boundary, produce compact cited notes for each half, then retry the requested
+reduction or final story from those completed notes. Each narrative request permits
+at most three splits across the entire recovery tree. Citation checks and the
+existing eight-level reduction cap still apply. If evidence cannot be split with
+references on both sides, or recovery is exhausted, stop without publishing a new
+recap/review pair. Never use the provider's partial text or silently truncate input.
+This recovery does not apply to JSON relevance extraction.
+
+Split/recombine and any citation recovery are additional paid text requests unless
+cached. Repeated identical requests reuse completed and incomplete diagnostic
+caches, so a known cutoff is not resubmitted before splitting. A previously uncached
+failure may need one new request before its cause can be diagnosed. Incomplete
+diagnostics with other reasons keep the same request blocked on rerun; investigate
+the reason rather than automatically retrying it.
+
+Leave an active overnight runner running. Later CLI processes load the updated
+implementation; an already-running summary process retains the old implementation.
+The overnight wrapper continues after session failures and records them in its
+status file. Rerun only failed summaries once those session writers have exited.
 
 ### Evidence and approval
 

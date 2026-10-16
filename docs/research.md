@@ -54,6 +54,19 @@ the sources, not claims that a source prescribes this software architecture.
 No pricing is hard-coded. No assumptions are made about the group's edition,
 published setting, session length, number of players, or recording method.
 
+## Incomplete text responses, 2026-10-16
+
+Reviewed the official [OpenAI incomplete-response handling guide](https://developers.openai.com/api/docs/guides/reasoning#allocating-space-for-reasoning).
+The documented output-cutoff signal is `status: incomplete` with
+`incomplete_details.reason: max_output_tokens`. This is a response-status check,
+not a change of model or an instruction to enable reasoning features. Keep this
+repository's model and 5,000-token cap unchanged. Only narrative requests with
+that exact signal may split and recombine original validated evidence, bounded
+to three splits. Other failures do not trigger recovery. Incomplete text must not
+enter notes or recaps; preserve its raw response separately for diagnosis. The
+user's original failed response was not saved by the earlier adapter, so its actual
+incomplete reason cannot be established retrospectively.
+
 ## Local ASR decoder compatibility, 2026-10-16
 
 The installed faster-whisper 1.2.1 decoder passes `metadata_errors="ignore"` into

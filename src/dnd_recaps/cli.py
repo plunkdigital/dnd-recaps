@@ -21,6 +21,10 @@ MAX_AUDIO_BYTES = 24_000_000  # Conservative headroom below the documented uploa
 MAX_CONTEXT_CHARS = 24_000
 
 
+class SummaryOutputLimit(ValueError):
+    """A provider-declared output cutoff; partial text is never usable evidence."""
+
+
 def load_environment(path, allowed_names=None):
     """Load simple dotenv assignments at runtime without executing shell content.
 
@@ -259,9 +263,18 @@ def generate(instructions, text, model, cache_dir):
     encoded = json.dumps(payload, ensure_ascii=False).encode()
     key = hashlib.sha256(encoded).hexdigest()
     cache = cache_dir / (key + ".json")
-    raw = read_json(cache) if cache.exists() else api("responses", encoded)
+    incomplete = cache_dir / "incomplete" / (key + ".json")
+    raw = (read_json(cache) if cache.exists() else
+           read_json(incomplete) if incomplete.exists() else api("responses", encoded))
     if raw.get("status") != "completed":
-        raise ValueError("Summary response did not complete; no final recap was written.")
+        save_json(incomplete, raw)  # Diagnostic cache, never a successful result.
+        details = raw.get("incomplete_details")
+        reason = details.get("reason") if isinstance(details, dict) else None
+        if raw.get("status") == "incomplete" and reason == "max_output_tokens":
+            raise SummaryOutputLimit("Summary reached its output-token limit. Partial text was preserved for diagnostics, not used.")
+        reason_label = "content_filter" if reason == "content_filter" else "not reported or not recoverable"
+        raise ValueError(f"Summary response did not complete (reason: {reason_label}). "
+                         "Diagnostic response preserved; no final recap was written.")
     output = "\n".join(part["text"] for item in raw.get("output", [])
                        if item.get("type") == "message" for part in item.get("content", [])
                        if part.get("type") == "output_text")
@@ -331,7 +344,8 @@ def summarize(root, dest, model, backend="openai"):
         task = ("\nWrite the final recap using the required sections." if final else
                 "\nExtract compact chronological evidence notes from this partial session. "
                 "Preserve source IDs, outcomes, uncertainties, and all unresolved threads; "
-                "do not write a final recap yet.")
+                "do not write a final recap yet. Aim for 600-900 words. Cite the minimum "
+                "1-3 exact supporting IDs per finding; do not repeat full source-ID inventories.")
         outputs = []
         for note in notes:
             stage = "final recap" if final else f"note reduction level {level + 1}"
@@ -451,7 +465,7 @@ def main():
                     summarize(root, dest, model)
     except (ValueError, OSError, KeyError, TypeError) as exc:
         # Do not expose raw exception text: decoder errors can contain private input.
-        message = str(exc) if type(exc) is ValueError else "Input or response is missing or malformed; check the stage files."
+        message = str(exc) if type(exc) in (ValueError, SummaryOutputLimit) else "Input or response is missing or malformed; check the stage files."
         parser.exit(1, f"Error: {message}\n")
 
 
