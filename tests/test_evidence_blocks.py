@@ -49,7 +49,7 @@ class EvidenceBlockTests(unittest.TestCase):
             self.assertEqual(again, result)
             self.assertEqual(api.call_count, 1)
             sent = json.loads(api.call_args.args[1])
-            self.assertIn("Narrative evidence blocks v1", sent["instructions"])
+            self.assertIn("Narrative evidence blocks v2", sent["instructions"])
             self.assertEqual(sent["input"], "Evidence [E1]")
             self.assertEqual(sent["text"]["format"], relevance.narrative_response_format({1: "c0007:s0042"}))
             self.assertEqual(cli.read_json(next(cache.glob("*.json"))), raw)
@@ -79,7 +79,8 @@ class EvidenceBlockTests(unittest.TestCase):
         self.assertEqual(block["required"], ["markdown", "evidence"])
         self.assertIs(block["additionalProperties"], False)
         refs = block["properties"]["evidence"]
-        self.assertEqual(refs["minItems"], 1)
+        self.assertEqual(refs["minItems"], 0)
+        self.assertEqual(refs["maxItems"], 3)
         self.assertEqual(refs["items"], {"type": "integer", "minimum": 1, "maximum": 2})
 
     def test_enforced_format_changes_cache_identity_without_overwriting_plain_requests(self):

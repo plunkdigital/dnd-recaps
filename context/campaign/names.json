@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "source": "User-supplied characters.md; spellings only, without event history or hidden identity links.",
+  "names": [
+    {"name": "Orlen Vex", "aliases": ["Cricket"], "from_session": 1},
+    {"name": "Crick", "aliases": [], "from_session": 1},
+    {"name": "Azlor", "aliases": [], "from_session": 1},
+    {"name": "Balder Enginnson", "aliases": [], "from_session": 1},
+    {"name": "Timmy", "aliases": [], "from_session": 1},
+    {"name": "Zathron", "aliases": [], "from_session": 1},
+    {"name": "Sefik Kaltro", "aliases": [], "from_session": 1},
+    {"name": "Auril", "aliases": ["Frostmaiden"], "from_session": 1},
+    {"name": "Tyr", "aliases": [], "from_session": 1},
+    {"name": "Jack Carrasien", "aliases": [], "from_session": 2},
+    {"name": "Yilthowral", "aliases": [], "from_session": 2},
+    {"name": "Thaddeus Hardius", "aliases": [], "from_session": 3},
+    {"name": "Esmeraldor Longfeast", "aliases": [], "from_session": 3}
+  ]
+}

@@ -1,227 +1,92 @@
 # Current project state
 
-Updated 2026-10-16. This file is the development re-entry point. Campaign continuity
-belongs in `context/campaign/state.md`; keep those two kinds of state separate.
+Updated 2026-10-17. Development state only; campaign canon belongs in
+`context/campaign/state.md`.
 
 ## Current phase
 
-Latest narrative failure: one response omitted every evidence array; its rewrite
-was invalid JSON. Prompt-only formatting was insufficient. Narrative requests now
-enforce a strict Responses JSON schema requiring nonempty numeric evidence arrays
-bounded to the current mapping, with local validation retained. Provider refusals
-stop safely and are saved as private diagnostics. All 105 offline tests pass.
-Read-only replay confirmed all 74 actual relevance caches remain reusable and the
-first narrative request now includes the schema (718 possible references). Both
-invalid cached responses remain rejected; they were not modified or promoted.
-No live API call, credential access, or interruption of the overnight job occurred.
-Live end-to-end success is still unverified. See [strict output checklist](STRICT_OUTPUT_PLAN.md).
-Already-running summaries retain old code; later CLI processes use this change.
+Latest direct Session 1 failure: cached replay found 30 non-JSON relevance responses
+and 1,980 withheld IDs. The path now preserves valid old classifications and repairs
+only unclassified IDs with strict required per-source labels, at most 32 per request.
+New batches use that schema directly. All 74 original batch caches remain reusable;
+84 additional small repair requests are needed for this cache set. No live requests
+were made by the agent. See [direct failure repair](SUMMARY_FAILURE_PLAN.md).
 
-The latest partial-reduction response and its citation rewrite still used ranges.
-Narrative requests now use request-local numeric evidence handles and JSON text
-blocks; code validates reference arrays and renders exact canonical IDs. Mapping
-hashes prevent cache reuse with a different ID binding. Strict legacy citations can
-still pass validation; ranges and invented IDs cannot. All 100 offline tests pass,
-including JSON rendering, invalid references, cache identity, and cutoff recovery.
-Read-only replay confirms all 74 relevance caches remain reusable; only narrative
-requests change. No live provider calls or credentials were used. See
-[citation rendering checklist](CITATION_RENDERING_PLAN.md).
+The historical generic exception has no recorded traceback and was not reproduced
+with current files. Summary modules now load together at CLI startup, removing a
+late-import version-mixing hazard. Unexpected errors report their class and code
+location while withholding private exception values. This is not proof of the
+historical exception's cause.
 
-The user also reports TF32 and pooling `std()` warnings during Session 2's overnight
-diarization. Installed code confirms TF32 is disabled, clustering filters NaNs, and
-voice-profile normalization rejects non-finite vectors. No precision/pooling changes
-or warning suppression were made. A warning is not by itself a failed stage or a
-quality guarantee; keep the overnight job running and inspect actual stage results.
+The overnight runner completed transcription and diarization for Sessions 2-6;
+all five summaries failed. The [output review](RUNNER_OUTPUT_REVIEW_2026-10-17.md)
+records the observed failures. Repairs are implemented and tested offline. A fresh
+live recap has not yet established end-to-end success.
 
-Session 1 completed all 74 relevance batches, then the older adapter reported an
-incomplete response at note reduction. Its reason was not retained and cannot be
-confirmed. The adapter now saves incomplete responses as separate diagnostics and
-recovers only explicitly reported output-token cutoffs, by splitting original
-validated narrative evidence and recombining completed cited notes. Recovery allows
-at most three splits per narrative request; no partial text becomes evidence.
-Non-final prompts request compact citation sets. All 93 offline tests pass. An
-offline replay confirmed all 74 Session 1 relevance cache identities are unchanged
-and reach reduction without API calls or writes. No provider call, credential load,
-or process interruption occurred. See [output-limit checklist](SUMMARY_LIMIT_PLAN.md).
+Narrative schemas now forbid square brackets and line breaks in prose blocks;
+each paragraph keeps its own 1-3 numeric references. Scene schemas allow at most
+four factual blocks of at most 45 words/400 characters each, bounding the complete
+note to 180 words. Local validation enforces those constraints, including through
+cutoff recovery. One regeneration from original evidence can recover invalid
+shape/size; invalid responses are never stripped, truncated or promoted.
 
-The user has already started the overnight runner. Leave it running; later summary
-processes pick up the new code, while any already-running summary retains old code.
-Use the batch status file to find failed sessions and rerun only their summaries.
+The preserved interrupted Session 3 preparation now has `archived: true`. Prior
+continuity lookup excludes explicitly archived metadata; genuine active duplicates
+still fail. No recording or transcript was removed or overwritten.
 
-The user reports summarization is progressing and requested an overnight run from
-Session 2 onward. `scripts/generate_recaps_remaining_gpu.sh --allow-cloud` now runs
-sessions 2–6, continues after individual session failures, and logs stage outcomes
-under ignored `recordings/catalog/batch-runs/`. The main runner also accepts
-`--from-session 1-6` and `--continue-on-error`; its defaults remain start at 1 and
-stop on failure. All 85 offline tests and shell syntax checks pass, including
-stub-only batch order, cloud authorization, logs, preflight and failure handling.
-No overnight job or provider call was started by the agent. See
-[overnight checklist](OVERNIGHT_BATCH_PLAN.md) and
-[run instructions](local-diarization.md#overnight-sessions-2-6).
+The existing runner supports `--summaries-only` and `--through-session`. Summary
+retry skips GPU checks, ASR and diarization. An implementation fingerprint is saved
+and checked around stages; changes stop the run even with continue-on-error.
+See the [completed repair checklist](RUNNER_REPAIR_PLAN.md) for details.
 
-Automatic relevance review is implemented. Every transcript batch is classified
-with validated source-ID coverage before campaign evidence notes reach the story.
-Unrelated chatter is omitted; ambiguous topics are withheld and retained outside
-recursive reduction in backend-specific `manual-check.draft.md`/`.json` files.
-The session's `manual-check.md` index and `review.md` remain human-owned decision
-logs. All 80 offline tests pass, including multi-batch preservation, withheld-ID
-checks, incomplete/malformed responses, cache invalidation, and backend isolation.
-No paid calls or real-audio processing occurred during this change. See the
-[implementation checklist](MANUAL_CHECK_PLAN.md) and
-[review workflow](workflow.md#campaign-relevance-and-manual-checks).
+## Grounding and remaining quality limits
 
-Latest failure: batch 4 contained a source assigned to conflicting groups. Relevance
-recovery now retains only independently validated, nonconflicting groups; omissions
-and all sources touched by invalid/conflicting groups are withheld for manual review.
-An unparseable response withholds the whole batch. Strict parsing still rejects
-bad evidence; only a fully validated augmented result enters narrative selection.
-Provider-incomplete responses and network failures still stop the run. Reports
-explicitly disclose partial/invalid model classification. Replayed the four actual
-cached batches offline: complete source coverage in all four, with 15/0/18/15 sources
-flagged for review respectively. Batch 4 retains 41 campaign source IDs. Raw caches
-are unchanged and no provider calls occurred. Retry the same summary command below;
-no GPU stages need repeating. See
-[coverage recovery checklist](RELEVANCE_RECOVERY_PLAN.md).
+The story uses chronological windows of retained original transcript, then one
+final narrative pass. Structural checks require adequate story length and evidence
+from opening/middle/ending thirds for substantial recordings. Window/citation checks
+do not prove claim support or exhaustive coverage. The older rejected Session 1
+draft remains unchanged and must not supply continuity.
 
-The user's older summary process subsequently failed citation validation. Read-only
-cache diagnostics found compressed citation ranges and nonexistent IDs in some
-intermediate notes. Exact individual citations are now required at every narrative
-stage, including when another valid citation is present. A single cached rewrite
-from the same validated evidence is attempted on citation failure, then failure
-stops publication. No guessed range expansion or ID substitution is performed.
-Transcription and diarization caches remain intact; rerun only summarize below.
-See [citation recovery checklist](CITATION_RECOVERY_PLAN.md). No live API calls
-were made to validate the repair.
+Session-bounded `names.json` supplies spellings without later events or hidden
+identity links. New ASR chunks use hints; old raw caches and IDs are preserved.
+Likely misspellings remain review suggestions, never automatic identity approval.
+No reviewed real-person speaker mapping exists. Acoustic quality is unverified.
 
-The user confirms first-recording GPU ASR completed all 13 chunks in about 323
-seconds and full-recording diarization subsequently completed. Embeddings took
-34 minutes 20 seconds; clustering continued without a progress bar. The wrapper
-now preloads mono audio in RAM to avoid per-window decoder creation; real speedup
-is unmeasured. PyAV 18.0.0 fixed the initial ASR decoder incompatibility. See the
-[decoder repair](GPU_DECODER_FIX_PLAN.md) and [embedding work](DIARIZATION_SPEED_PLAN.md).
+Session 1 has no Previously section. Later summaries load only the immediately
+preceding reviewed recap, with qualified prior-session citations. An unattended run
+does not approve its own drafts. Early recordings still exclude the combined
+Sessions 1-3 event history, and all player recaps exclude DM files.
 
-Initial scaffold and sibling-repository preference review were committed in
-`d181d42`. Player-context and runtime-configuration changes are committed in
-`b8251f5`. DM-reference and recording intake were committed in `c9af644`.
-The first transcription/recap batch is authorized. All six recordings are prepared
-locally. The user reports slow cloud processing; this runtime has no API key and
-cannot read the protected `.env`. At GPU investigation, no completed raw responses
-or recaps were visible. The agent has not stopped or replaced the user's cloud job.
-See [first batch checklist](FIRST_BATCH_PLAN.md).
+## Verification
 
-The user reports a 3080 and requests local transcription, diarization, and automatic
-cross-session voice proposals for review. This is implemented in the dedicated
-project `.venv`, with separate ASR, speaker-turn, labelled-transcript, and recap
-caches. Reviewed identities seed local voice profiles; matching never approves its
-own identities. The user says they are stopping the cloud batch locally; the agent
-did not terminate it. Two completed cloud chunks for the first recording were
-visible during this investigation and were preserved.
+- 131 offline tests passed with the project `.venv`, using synthetic evidence and
+  mocked providers. Shell syntax, documentation links and Git whitespace passed.
+- All five actual failed scene-response shapes remain rejected and unmodified.
+  Read-only current-context replay reuses 66/50/27 relevance requests for Sessions
+  3/5/6, respectively; Sessions 2/4 require fresh relevance requests. New narrative
+  requests have new schema/transport identities. Session 4 predecessor lookup passes.
+- The previous review verified all 50 Sessions 2-6 chunk hashes and observed logged
+  embedding times of 1:44-3:03. Audio did not need repeating for these repairs.
+- No protected credentials, paid request, fresh inference or recap generation was
+  performed by the agent. Live schema behavior and prose still require validation.
 
-At initial setup all 50 offline tests and package import/dependency checks passed.
-Model access, ASR inference, and full diarization were later confirmed by user output.
-Voice-match quality and optimized embedding speed remain unverified; this agent
-runtime cannot access CUDA or protected credentials.
-See [local diarization setup](local-diarization.md),
-[diarization checklist](LOCAL_DIARIZATION_PLAN.md), and [GPU setup](gpu-transcription.md).
+## Next usable step
 
-The CLI supports local preparation, cached diarized transcription, and bounded
-recursive recap generation. Recaps use embellished storytelling grounded in source
-events with a compact reference appendix. See `README.md` for exact commands,
-`docs/workflow.md` for contracts/limits, and `docs/preferences.md` for adopted
-working conventions and their sources. The preference review changed documentation
-only; it did not change pipeline behavior. The subsequent player setup adds local
-runtime `.env` loading after the cloud flag, a safe `config/codex-test.env`, and a
-24,000-character context budget. See [setup checklist](PLAYER_SETUP_PLAN.md).
-
-The user is a player in Icewind Dale: Rime of the Frostmaiden. Their character notes
-cover Sessions 1–3 and were preserved unchanged by the setup work. Public introductory
-setting context, a table glossary, and secondary-source continuity now accompany
-those notes. Player context contains no future module secrets. The user reports configuring the
-real `.env`; its contents and key validity were not inspected or tested.
-
-The user subsequently authorized a separate DM spoiler reference. It is stored in
-the clearly labelled file under `context/dm/`, with a warning and collapsed content,
-and is eligible for tracking. It remains excluded from player inputs. The reference
-is sourced and limited, not a full sourcebook or the table's actual DM plan.
-See [DM and inbox checklist](DM_AND_INBOX_PLAN.md) and
-[recording intake](recording-intake.md). Keep its actual spoilers out of this state file.
-
-## Observed verification
-
-- Initial scaffold on 2026-10-16: 11 tests discovered, 10 passed, 1 skipped because
-  FFmpeg was unavailable. CLI help and Git whitespace checks passed.
-- At the initial baseline, live OpenAI calls and real-audio conversion were unverified.
-  Subsequent preparation checks are recorded below; provider calls remain unverified.
-- Documentation preference review on 2026-10-16: Markdown targets, consistency,
-  authored-prose punctuation, and whitespace checked. No behavior tests rerun for
-  this documentation-only change.
-- Player setup on 2026-10-16: 19 tests discovered, 18 passed, 1 skipped (FFmpeg
-  unavailable). Tests cover synthetic dotenv parsing, environment/model precedence,
-  no shell execution, no secret values in errors, no config reads in preparation,
-  help or unapproved cloud stages, and the supplied campaign context budget.
-  CLI help and whitespace checks passed. No real key read and no paid API calls.
-- DM reference and inbox review on 2026-10-16: all 19 tests passed, including actual
-  FFmpeg conversion of synthetic audio and exclusion of the named tracked spoiler
-  reference from player requests. FFmpeg/FFprobe are now installed. Six real M4A
-  headers and source hashes were inspected locally; no real audio was transcribed.
-  Local catalog totals 19.99 hours, with no exact duplicates. Ordering is provisional
-  from embedded UTC creation timestamps; upload timestamps were not used.
-- First batch on 2026-10-16: user confirmed the recording sequence. All 22 tests
-  passed, including nonzero audio seeking and exclusion of later historical context
-  from early-recording inputs. Shell syntax and Git whitespace checks passed.
-  All six real sources are unchanged; 63 prepared chunks passed hash, duration,
-  mono/24 kHz format, and upload-size checks. No live API calls occurred.
-  Interrupted third-recording artifacts were preserved separately; its canonical
-  preparation was regenerated and verified. Remaining cloud checks are outstanding.
-
-## Immediate next step and remaining setup
-
-For the user's authorized remaining batch, run:
+Regenerate Session 1's text only, after any existing writer for it has exited:
 
 ```bash
-./scripts/generate_recaps_remaining_gpu.sh --allow-cloud
+./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --through-session 1
 ```
 
-Keep the computer awake; use the linked nohup command if closing the terminal.
-This skips Session 1 and can run alongside its separate summary. Check the printed
-run log and status.tsv for failures and review manual-check.md files in the morning.
-
-The user's first diarization has completed. Let any active summary writer finish.
-Later summary processes in the existing batch automatically use the new relevance
-workflow. If Session 1 summarized with the older process, rerun only its summary
-after that session has no active writer:
+This sends transcript/context to OpenAI and may incur text charges. Review its tale,
+manual checks and `scene-coverage.draft.json`. Record corrections/reviewer/date in
+`review.md` and save the approved copy as
+`summaries/cuda-diarized/recap.reviewed.md`. Then retry later summaries using:
 
 ```bash
-./scripts/gpu_python.sh -m dnd_recaps summarize session-001-spice-bag --transcript-backend cuda-diarized --allow-cloud
+./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --from-session 2 --continue-on-error
 ```
 
-This performs cached/paid text work only, with no repeated GPU ASR or diarization.
-Review `sessions/session-001-spice-bag/manual-check.md` and its linked diarized
-report. Keep decisions in that index or `review.md`; generated drafts are replaced
-on rerun. Check facts, relevance, speaker identities, and audience before sharing.
-
-The first known speaker identities must be reviewed with `map-speaker`. Subsequent
-recordings write `speaker-proposals.md` for review; `propose-speakers` refreshes them
-without inference after initial enrollment. Accepted mappings keep stable participant
-IDs across sessions; numeric cluster labels alone never establish identity. Voice
-vectors stay in ignored local caches, and no real voice profiles have been enrolled
-by the agent. Model-access terms still require the user's own acceptance.
-
-The original cloud batch remains available:
-
-```bash
-bash scripts/generate_recaps.sh --allow-cloud
-```
-
-It processes the six prepared sessions in user-confirmed order using the operator's
-local `.env`, generating `transcripts/transcript.json`, a readable transcript, and
-`summaries/recap.draft.md` under each session. Completed request caches are reused
-on rerun. The agent must not load the protected secret file indirectly through this
-script. The user must run the command locally in this environment.
-
-Originals and Windows sidecars were not renamed or removed. The local catalog
-contains confirmed relative order and preparation status; exact play dates remain
-unset. Recordings 1–3 use `recording_only` context to avoid later-history leakage;
-4–6 use the supplied prior campaign history. DM context stays excluded throughout.
-After cloud completion, inspect speaker identities, factual support, completeness,
-and narrative quality against the audio before sharing drafts or promoting canon.
+Use `--through-session N` for one-at-a-time review and continuity. Finish pipeline
+edits before running. See [local operation](local-diarization.md#retry-completed-audio-without-gpu-work)
+for logs, cache behavior and limitations. No commit or push was requested.

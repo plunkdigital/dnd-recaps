@@ -125,6 +125,26 @@ class GpuTests(unittest.TestCase):
         self.assertEqual(data["segments"][1]["words"][0]["start"], 1196)
         self.assertTrue(engine.transcribe.call_args.kwargs["word_timestamps"])
 
+    def test_name_hints_apply_to_new_audio_but_do_not_rewrite_cached_evidence(self):
+        cli.save_json(self.dest / "session.json", {"session_number": 1})
+        cli.save_json(self.root / "context/campaign/names.json", {"names": [
+            {"name": "Azlor", "aliases": [], "from_session": 1},
+            {"name": "FutureName", "aliases": [], "from_session": 2}]})
+        engine = Mock()
+        engine.transcribe.side_effect = lambda *a, **kw: (iter([self.segment()]), SimpleNamespace(language="en"))
+        with patch.object(gpu, "create_model", return_value=engine), contextlib.redirect_stdout(io.StringIO()):
+            gpu.transcribe(self.dest)
+        self.assertIn("Azlor", engine.transcribe.call_args.kwargs["hotwords"])
+        self.assertNotIn("FutureName", engine.transcribe.call_args.kwargs["hotwords"])
+        caches = {p: p.read_bytes() for p in (self.dest / "transcripts/cuda/raw").glob("*.json")}
+        cli.save_json(self.root / "context/campaign/names.json", {"names": [
+            {"name": "DifferentName", "aliases": [], "from_session": 1}]})
+        with patch.object(gpu, "create_model") as create, contextlib.redirect_stdout(io.StringIO()) as log:
+            gpu.transcribe(self.dest)
+        create.assert_not_called()
+        self.assertIn("current spelling hints were not applied", log.getvalue())
+        self.assertTrue(all(p.read_bytes() == content for p, content in caches.items()))
+
     def test_legacy_wordless_caches_are_reused_without_inference(self):
         parameters = {"beam_size": 5, "vad_filter": True, "condition_on_previous_text": False, "task": "transcribe"}
         for chunk in self.chunks:

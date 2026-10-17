@@ -28,6 +28,67 @@ Do not add timestamps: code obtains them from the original transcript.
 """
 
 
+def classification_format(expected):
+    return {"type": "json_schema", "name": "campaign_source_labels", "strict": True,
+            "schema": {"type": "object", "additionalProperties": False,
+                       "required": ["classifications"], "properties": {"classifications": {
+                           "type": "object", "additionalProperties": False,
+                           "required": sorted(expected),
+                           "properties": {source: {"$ref": "#/$defs/classification"} for source in sorted(expected)}}},
+                       "$defs": {"classification": {"type": "object", "additionalProperties": False,
+                                 "required": ["category", "question"], "properties": {
+                                     "category": {"type": "string", "enum": ["campaign", "unrelated", "uncertain"]},
+                                     "question": {"type": "string", "maxLength": 240}}}}}}
+
+
+def classify_sources(instructions, source, expected, model, cache):
+    from .cli import generate
+
+    if len(expected) > 32:
+        ordered = sorted(expected)
+        return [item for index in range(0, len(ordered), 32)
+                for item in classify_sources(instructions, source, set(ordered[index:index + 32]), model, cache)]
+    task = ("\nCampaign relevance extraction v1 compatibility; required per-source classification v2. "
+            "Return ONLY the schema's classifications object. Each required source ID is a key, with "
+            "category campaign, unrelated or uncertain, and question. Do not return event notes or ID lists. "
+            "Use surrounding dialogue to classify short replies, rolls, corrections and campaign planning. "
+            "Exclude clearly unrelated personal/social chatter. If relevance is truly unclear, choose uncertain "
+            "and supply a short neutral review question without private details or possible secrets. "
+            "For campaign/unrelated use an empty question. Names and prior context do not establish new events. "
+            "Only classify the required IDs; the rest of the batch is context. Required IDs: " + json.dumps(sorted(expected)))
+    output = generate(instructions + task, source, model, cache, response_format=classification_format(expected))
+    def unique_fields(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("Duplicate classification field.")
+            result[key] = value
+        return result
+    try:
+        data = json.loads(output, object_pairs_hook=unique_fields)
+        labels = data["classifications"]
+        if not isinstance(labels, dict) or set(labels) != expected:
+            raise ValueError
+        items = []
+        for identity in sorted(expected):
+            record = labels[identity]
+            category, question = record["category"], record["question"]
+            if category not in {"campaign", "unrelated", "uncertain"} or not isinstance(question, str) or len(question) > 240:
+                raise ValueError
+            item = {"source_ids": [identity], "category": category}
+            if category == "campaign":
+                item["note"] = "Campaign speech; consult original transcript for events."
+            elif category == "uncertain":
+                item.update(topic="Campaign relevance requires review",
+                            question=question.strip() or "Is this source span related to the campaign?")
+            items.append(item)
+        return parse_extraction(json.dumps({"items": items}), expected)
+    except (ValueError, KeyError, TypeError):
+        # Complete validated legacy classifications can still pass during
+        # migration; malformed results remain withheld, never guessed.
+        return recover_omitted_sources(output, expected)
+
+
 def citations(text):
     return set(re.findall(r"\[(c\d+:s\d+)\]", text))
 
@@ -36,65 +97,100 @@ def valid_citations(text, allowed):
     matches = list(re.finditer(r"\[(c\d+:s\d+)\]", text))
     if not matches or not {match[1] for match in matches} <= allowed:
         return False
+    if any(citations(line) for line in text.splitlines() if re.match(r"^#{1,6}\s", line)):
+        return False
+    if any(len(re.findall(r"\[c\d+:s\d+\]", paragraph)) > 3 for paragraph in text.split("\n\n")):
+        return False
     # Do not let one valid reference conceal compressed, bare, or invented IDs.
     remaining = re.sub(r"\[c\d+:s\d+\]", "", text)
-    return re.search(r"\bc\d+\s*:\s*s\d+\b|\[\s*s\d+\b", remaining) is None
+    return re.search(r"\bc\d+\s*:\s*s\d+\b|\[\s*s\d+\b|\[\s*\d+(?:\s*[,–-]\s*\d+)*\s*\]", remaining) is None
 
 
-def citation_transport(instructions, source):
+def citation_transport(instructions, source, compact=False):
     ids = sorted(citations(source))
     mapping = {index: identity for index, identity in enumerate(ids, 1)}
     numbers = {identity: index for index, identity in mapping.items()}
     text = re.sub(r"\[(c\d+:s\d+)\]", lambda match: f"[E{numbers[match[1]]}]", source)
     fingerprint = hashlib.sha256(json.dumps(mapping, sort_keys=True).encode()).hexdigest()
-    contract = ("\nNarrative evidence blocks v1. Return ONLY a JSON object, without code fences: "
+    contract = ("\nNarrative evidence blocks v2. Return ONLY a JSON object, without code fences: "
                 '{"blocks":[{"markdown":"Heading or prose", "evidence":[1,2]}]}. '
                 "Evidence numbers are examples only. Use only numeric evidence handles [E<number>] "
                 "actually present in this input. This overrides literal citation formatting in earlier instructions: "
                 "put integer reference numbers in evidence arrays, never in prose. Code writes canonical citations. "
                 "Never use ranges, shorthand, strings, or invented reference numbers. "
                 "Write the requested story sections or compact notes in markdown blocks. "
-                "Every block needs at least one supporting evidence number. "
-                "Combine headings with the following supported prose in the same block. "
+                "Each prose block is ONE paragraph or ONE appendix bullet with 1-3 supporting evidence numbers. "
+                "Put each heading in its own block with an EMPTY evidence array; headings have no citations. "
+                "Never append a source inventory to a title or section. Keep paragraphs under 1600 characters. "
                 "Do not put source IDs or [E<number>] markers in markdown. "
+                "A markdown string is a SINGLE LINE. No brackets, line breaks or embedded citations. "
                 "Evidence numbers are local to this request and must not be reused from another request. "
                 "Evidence mapping SHA-256: " + fingerprint)
+    if compact:
+        contract += ("\nCompact scene contract v1: return 1-4 factual blocks, each at most 45 "
+                     "whitespace-separated words and 400 characters, at most 180 words TOTAL. "
+                     "No headings or appendix. Each block must have 1-3 supporting evidence numbers. "
+                     "Select the consequential outcomes and uncertainties; do not inventory every utterance.")
     return instructions + contract, text, mapping
 
 
-def narrative_response_format(mapping):
+def narrative_response_format(mapping, compact=False):
     if not mapping:
         raise ValueError("Narrative generation requires source evidence references.")
-    return {"type": "json_schema", "name": "narrative_evidence_blocks", "strict": True,
+    # Compact blocks have at most 45 whitespace-delimited words. Four blocks
+    # bound the complete prose to 180 words and rendered output below 2,400 chars.
+    pattern = r"^([^\s\[\]]+[ \t]+){0,44}[^\s\[\]]+$" if compact else r"^[^\[\]\r\n]+$"
+    result = {"type": "json_schema", "name": "narrative_evidence_blocks", "strict": True,
             "schema": {"type": "object", "additionalProperties": False, "required": ["blocks"],
                        "properties": {"blocks": {
                            "type": "array", "minItems": 1,
                            "items": {"type": "object", "additionalProperties": False,
                                      "required": ["markdown", "evidence"],
                                      "properties": {
-                                         "markdown": {"type": "string", "minLength": 1},
-                                         "evidence": {"type": "array", "minItems": 1,
+                                         "markdown": {"type": "string", "minLength": 1,
+                                                      "maxLength": 400 if compact else 1600, "pattern": pattern},
+                                         "evidence": {"type": "array", "minItems": 1 if compact else 0, "maxItems": 3,
                                                       "items": {"type": "integer", "minimum": 1,
                                                                 "maximum": len(mapping)}}}}}}}}
+    if compact:
+        result["schema"]["properties"]["blocks"]["maxItems"] = 4
+    return result
 
 
-def render_evidence_blocks(output, mapping):
+def render_evidence_blocks(output, mapping, compact=False):
     try:
         data = json.loads(output)
     except ValueError:
         # Backward-compatible acceptance still requires strict canonical IDs.
-        return output if valid_citations(output, set(mapping.values())) else None
+        if not valid_citations(output, set(mapping.values())):
+            return None
+        if compact:
+            # Old Markdown caches remain evidence only when they satisfy the
+            # same scene budget. Never truncate or discard a response fragment.
+            prose = re.sub(r"\[c\d+:s\d+\]", "", output)
+            paragraphs = [p.strip() for p in prose.split("\n\n") if p.strip()]
+            if (not 1 <= len(paragraphs) <= 4 or len(output) > 2400
+                    or any(len(p) > 400 or len(p.split()) > 45 or "\n" in p or p.startswith("#") for p in paragraphs)):
+                return None
+        return output
     try:
         blocks = data["blocks"]
-        if not isinstance(blocks, list) or not blocks:
+        if not isinstance(blocks, list) or not blocks or (compact and len(blocks) > 4):
             return None
         rendered = []
         for block in blocks:
             text, refs = block["markdown"], block["evidence"]
             if (not isinstance(text, str) or not text.strip() or not isinstance(refs, list)
                     or any(type(ref) is not int or ref not in mapping for ref in refs)
-                    or len(refs) != len(set(refs))
-                    or re.search(r"\bc\d+\s*:\s*s\d+\b|\[E\d+\]", text)):
+                    or len(refs) != len(set(refs)) or len(refs) > 3 or len(text) > (400 if compact else 1600)
+                    or re.search(r"[\[\]\r\n]", text)
+                    or re.search(r"\bc\d+\s*:\s*s\d+\b|\[E\d+\]|\[\s*\d+(?:\s*[,–-]\s*\d+)*\s*\]", text)):
+                return None
+            if compact and (not refs or text.lstrip().startswith("#") or len(text.split()) > 45):
+                return None
+            prose = "\n".join(line for line in text.splitlines()
+                              if not re.match(r"^#{1,6}\s", line)).strip()
+            if refs and (not prose or "\n\n" in prose):
                 return None
             if not refs and not all(re.fullmatch(r"#{1,6}\s+.+|Not established\.?", line.strip())
                                     for line in text.splitlines() if line.strip()):
@@ -106,18 +202,18 @@ def render_evidence_blocks(output, mapping):
         return None
 
 
-def generate_cited(instructions, source, model, cache, stage, recovery=None):
+def generate_cited(instructions, source, model, cache, stage, recovery=None, compact=False):
     from .cli import generate, SummaryOutputLimit
 
     if recovery is None:
         recovery = {"splits": 0}
-    transported, text, mapping = citation_transport(instructions, source)
-    response_format = narrative_response_format(mapping)
+    transported, text, mapping = citation_transport(instructions, source, compact=compact)
+    response_format = narrative_response_format(mapping, compact=compact)
     try:
         output = generate(transported, text, model, cache, response_format=response_format)
     except SummaryOutputLimit:
-        return reduce_after_cutoff(instructions, source, model, cache, stage, recovery)
-    rendered = render_evidence_blocks(output, mapping)
+        return reduce_after_cutoff(instructions, source, model, cache, stage, recovery, compact=compact)
+    rendered = render_evidence_blocks(output, mapping, compact=compact)
     if rendered is not None:
         return rendered
     print(f"Citation validation failed during {stage}; regenerating once from supplied evidence.", flush=True)
@@ -126,20 +222,24 @@ def generate_cited(instructions, source, model, cache, stage, recovery=None):
     repair = ("\nCitation recovery attempt 1. The previous response failed evidence-block validation. "
               "Rewrite from the supplied evidence only using the JSON blocks contract. "
               "Put supporting integer evidence numbers in each block's evidence array. "
+              "Each markdown string MUST be a single line, with no brackets or embedded citations. "
+              "Separate paragraphs into distinct blocks; never share evidence across several paragraphs. "
               "Do not put citations or evidence handles in prose, and never invent or expand ranges. "
               "If evidence cannot support a claim, omit it. The permitted numbers are: " + json.dumps(list(mapping)))
+    if compact:
+        repair += " Compact-note recovery: at most four blocks, at most 45 words and 400 characters EACH. No headings."
     try:
         output = generate(transported + repair, text, model, cache, response_format=response_format)
     except SummaryOutputLimit:
-        return reduce_after_cutoff(instructions, source, model, cache, stage, recovery)
-    rendered = render_evidence_blocks(output, mapping)
+        return reduce_after_cutoff(instructions, source, model, cache, stage, recovery, compact=compact)
+    rendered = render_evidence_blocks(output, mapping, compact=compact)
     if rendered is None:
         raise ValueError(f"Citation validation failed during {stage}, including one recovery attempt. "
                          "No new recap/review pair published. Original responses and completed audio stages remain cached.")
     return rendered
 
 
-def reduce_after_cutoff(instructions, source, model, cache, stage, recovery):
+def reduce_after_cutoff(instructions, source, model, cache, stage, recovery, compact=False):
     """Bounded recovery using whole evidence lines, never the provider's partial text."""
     lines = source.splitlines(keepends=True)
     if recovery["splits"] >= 3 or len(lines) < 2:
@@ -159,14 +259,15 @@ def reduce_after_cutoff(instructions, source, model, cache, stage, recovery):
                          "No new recap/review pair published.")
     print(f"Output-token cutoff during {stage}; reducing two smaller evidence groups "
           f"(split {recovery['splits']}/3).", flush=True)
-    compact = ("\nOutput-limit recovery v1. This input is partial session evidence. "
+    recovery_task = ("\nOutput-limit recovery v1. This input is partial session evidence. "
                "Override story formatting for this step: produce compact chronological evidence notes only, "
                "at most 600 words. Retain consequential outcomes, choices, clues, resources, uncertainties, "
                "unresolved threads and stopping information present here. Cite only 1-3 exact supporting "
                "IDs per finding, not a complete ID inventory. No invented events or final recap.")
-    reduced = [generate_cited(instructions + compact, part, model, cache, stage + " partial recovery", recovery)
+    reduced = [generate_cited(instructions + recovery_task, part, model, cache, stage + " partial recovery", recovery,
+                             compact=compact)
                for part in parts]
-    return generate_cited(instructions, "\n".join(reduced), model, cache, stage, recovery)
+    return generate_cited(instructions, "\n".join(reduced), model, cache, stage, recovery, compact=compact)
 
 
 def source_batches(segments, render, limit=8000):
@@ -319,7 +420,8 @@ def render_checks(checks, segments, backend, transcript_hash):
     lines = ["# Manual campaign relevance checks", "", status,
              "This is model-generated selection, not a guarantee that every ambiguity was detected.",
              f"Transcript backend: `{backend}`. Transcript SHA-256: `{transcript_hash}`.", "",
-             "Ambiguous material was withheld from the draft. Check the source audio before deciding.",
+             "Material with unclear campaign relevance was withheld. Check the source audio before deciding.",
+             "Spelling suggestions alone do not exclude an event or establish a character identity.",
              "Record decisions and reviewer/date in the session's manual-check.md or review.md;",
              "this generated draft is replaced on rerun. Do not edit it to retain decisions.", ""]
     if unclassified:

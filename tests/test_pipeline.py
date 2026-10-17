@@ -127,6 +127,31 @@ class PipelineTests(unittest.TestCase):
             cli.summarize(self.root, self.dest, "test-model")
         api.assert_not_called()
 
+    def test_reviewed_previous_session_is_used_without_rebinding_its_citations(self):
+        self.seed_transcript()
+        metadata = cli.read_json(self.dest / "session.json")
+        metadata.update(session_number=2, campaign="test", context_policy="recording_only")
+        cli.save_json(self.dest / "session.json", metadata)
+        prior = self.root / "sessions/prior"
+        cli.save_json(prior / "session.json", {"session_number": 1, "campaign": "test"})
+        reviewed = prior / "summaries/recap.reviewed.md"
+        cli.write(reviewed, "The old bridge fell. [c0000:s0002]")
+        def reply(endpoint, body):
+            data = json.loads(body)
+            if "Write only a short Previously paragraph" in data["instructions"]:
+                self.assertIn("old bridge fell", data["input"])
+                return response(json.dumps({"blocks": [{"markdown": "The bridge had fallen.", "evidence": [1]}]}))
+            return summary_reply("# Session recap\n\n## The tale\n\nThe key was accepted. [c0000:s0002]")(endpoint, body)
+        with patch.object(cli, "api", side_effect=reply), contextlib.redirect_stdout(io.StringIO()):
+            cli.summarize(self.root, self.dest, "fixture")
+        recap = (self.dest / "summaries/recap.draft.md").read_text()
+        self.assertIn("## Previously", recap)
+        self.assertIn("[Session 1: c0000:s0002]", recap)
+        self.assertIn("accepted. [c0000:s0002]", recap)
+        provenance = cli.read_json(self.dest / "summaries/provenance.json")
+        self.assertEqual(provenance["previous_reviewed_sha256"], cli.digest(reviewed))
+        self.assertEqual(provenance["previous_reviewed_recap"], "sessions/prior/summaries/recap.reviewed.md")
+
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "FFmpeg unavailable")
     def test_nonzero_chunk_seek_preserves_late_audio(self):
         import array
@@ -174,7 +199,7 @@ class PipelineTests(unittest.TestCase):
             if "partial session" in data["instructions"]:
                 import re
                 numbers = sorted({int(n) for n in re.findall(r"\[E(\d+)\]", data["input"])})
-                return response(json.dumps({"blocks": [{"markdown": "Evidence notes", "evidence": numbers}]}))
+                return response(json.dumps({"blocks": [{"markdown": "Evidence notes", "evidence": numbers[:3]}]}))
             return response("# Session recap\nA tale [c0000:s0000]")
         with patch.object(cli, "api", side_effect=fake_api) as api, contextlib.redirect_stdout(io.StringIO()):
             cli.summarize(self.root, self.dest, "test-model")

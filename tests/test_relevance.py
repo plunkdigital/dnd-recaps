@@ -127,7 +127,7 @@ class RelevanceTests(unittest.TestCase):
             self.assertIn(f"`{backend}`", report)
         self.assertEqual(original, (self.dest / "summaries/manual-check.draft.md").read_bytes())
 
-    def test_questions_survive_separately_while_narrative_notes_are_reduced(self):
+    def test_grouped_extraction_prose_is_not_recycled_as_story_evidence(self):
         def reply(endpoint, body):
             data = json.loads(body)
             if "Campaign relevance extraction v1" in data["instructions"]:
@@ -138,7 +138,8 @@ class RelevanceTests(unittest.TestCase):
             self.assertNotIn("c0000:s0002", data["input"])
             return response("Evidence [c0000:s0000]")
         api = self.run_summary(reply)
-        self.assertGreater(api.call_count, 2)
+        self.assertEqual(api.call_count, 2)
+        self.assertNotIn("Campaign evidence.", json.loads(api.call_args.args[1])["input"])
         self.assertIn("Does this concern", (self.dest / "summaries/manual-check.draft.md").read_text())
 
     def test_uncertain_repeated_segment_overrides_campaign_and_deduplicates_question(self):

@@ -68,6 +68,13 @@ def transcribe(dest, model_name="turbo"):
     all_segments = []
     parameters = {"beam_size": 5, "vad_filter": True, "condition_on_previous_text": False,
                   "task": "transcribe", "word_timestamps": True}
+    from .campaign import name_reference
+    root = dest.parent.parent
+    hints = name_reference(root, read_json(dest / "session.json")) if (dest / "session.json").exists() else ""
+    if hints:
+        # Unlike initial_prompt, hotwords are supplied to every decoding window
+        # even though prior decoded text is deliberately not carried forward.
+        parameters["hotwords"] = hints
     for chunk in manifest["chunks"]:
         path = dest / chunk["path"]
         if digest(path) != chunk["sha256"]:
@@ -77,10 +84,19 @@ def transcribe(dest, model_name="turbo"):
         cache = output / "raw" / (chunk["id"] + ".json")
         if cache.exists():
             cached = read_json(cache)
-            legacy = {**identity, "parameters": {key: value for key, value in parameters.items()
-                                                if key != "word_timestamps"}}
-            if cached["input"] not in (identity, legacy):
+            # Existing segmentation defines evidence IDs. Hints apply only to
+            # new chunks; never replace old raw responses to retrofit spellings.
+            existing = cached["input"]
+            compatible = {**existing, "parameters": {key: value for key, value in existing["parameters"].items()
+                                                      if key not in {"initial_prompt", "hotwords"}}}
+            current = {**identity, "parameters": {key: value for key, value in parameters.items()
+                                                  if key not in {"initial_prompt", "hotwords"}}}
+            old = {**current, "parameters": {key: value for key, value in current["parameters"].items()
+                                              if key != "word_timestamps"}}
+            if compatible not in (current, old):
                 raise ValueError("GPU cache settings differ. Preserve existing results and use a new session ID for another model.")
+            if any(existing["parameters"].get(key) != parameters.get(key) for key in ("initial_prompt", "hotwords")):
+                print(f"Preserving {chunk['id']} cached segmentation; current spelling hints were not applied to this chunk.", flush=True)
             raw = cached["response"]
         else:
             if engine is None:

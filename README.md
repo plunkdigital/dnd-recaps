@@ -63,6 +63,28 @@ After checking evidence and spoilers, copy the draft to `summaries/recap.reviewe
 record the reviewer/date in `review.md`, and update `context/campaign/state.md`
 manually with session and segment references. The pipeline never promotes drafts
 to campaign canon. A later summary run replaces only the draft, not a reviewed file.
+For GPU diarized output, keep the reviewed copy beside its draft under
+`summaries/cuda-diarized/`. Subsequent sessions automatically load the immediately
+preceding reviewed recap as continuity. Drafts are excluded. Session 1 opens directly
+with the tale; later sessions include Previously only with a reviewed predecessor.
+Session numbers and campaign names in `session.json` determine this relationship.
+
+Canonical name spellings now live separately in `context/campaign/names.json`, so
+early recordings can use your supplied names without importing later events. New
+GPU ASR chunks receive spelling hints. Existing cached transcripts retain their
+words and IDs; summarization uses the same name reference and flags likely spelling
+errors in manual checks. Hints improve the available context, not guaranteed accuracy.
+
+If transcription and diarization already finished, retry just Session 1's text work:
+
+```bash
+./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --through-session 1
+```
+
+This skips GPU checks and audio inference. After reviewing Session 1, see
+[summary-only recovery](docs/local-diarization.md#retry-completed-audio-without-gpu-work)
+for the remaining sessions. The runner records its implementation fingerprint and
+stops at a stage boundary if pipeline files change during processing.
 
 For an installed command, optionally use `python3 -m venv .venv`, activate it and
 `python3 -m pip install -e .`; then use `dnd-recaps` in place of the module command.

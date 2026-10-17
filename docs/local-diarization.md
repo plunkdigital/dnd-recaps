@@ -77,7 +77,46 @@ For a summary-only failure, rerun that session's `summarize` command rather than
 repeat audio stages. No human review decisions or campaign state are applied by
 the batch. Without these options the original runner still starts at Session 1
 and stops at the first session failure. Offline stub-command tests cover these
-paths; actual overnight completion and live-provider reliability are unverified.
+paths. The 2026-10-16 run completed all five audio stages but every summary failed;
+see the [output review](RUNNER_OUTPUT_REVIEW_2026-10-17.md). Repairs have offline
+regressions; a repaired live recap run is still unverified.
+
+### Retry completed audio without GPU work
+
+The summary repair does not need new audio inference. To regenerate only Session 1:
+
+```bash
+./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --through-session 1
+```
+
+This skips both GPU/model preflight checks and every transcription/diarization
+command. It reads the existing diarized transcript and sends text/context to
+OpenAI. Updated narrative schemas create new request identities. Read-only replay
+confirmed all existing relevance requests for Sessions 3, 5 and 6 still match;
+Sessions 2 and 4 need fresh relevance requests under current context. Completed
+provider responses are preserved; identical new requests are cached normally.
+Unclassified IDs in those legacy responses now trigger small structured repair
+requests instead of being permanently lost to the story. Session 1's latest cache
+requires 84 such requests for 1,980 IDs. New or uncached batches use strict labels
+directly. Valid cached categories and all audio stages are preserved. Direct CLI
+runs preload summary modules before classification; unexpected failures report
+their exception type and safe code location without private exception values.
+
+Review the new Session 1 draft and record reviewer/date and corrections in
+`review.md`. Save an approved copy beside it as `recap.reviewed.md` before later
+summaries if they should incorporate that continuity. Then retry Sessions 2-6:
+
+```bash
+./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --from-session 2 --continue-on-error
+```
+
+Each later session uses only a reviewed immediate predecessor. An unattended run
+does not review its own drafts, so missing reviewed continuity remains explicit.
+Use `--through-session N` to stop after a particular session for sequential review.
+Keep the computer awake. All batch modes record an implementation fingerprint and
+stop if pipeline, prompt or player-context files change during the run, including
+when continue-on-error is set. Finish editing first. Cached audio and manual
+transcript corrections are left untouched by summary-only mode.
 
 ### Embedding performance
 

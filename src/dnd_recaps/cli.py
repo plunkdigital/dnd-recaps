@@ -14,6 +14,11 @@ import tempfile
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 import uuid
+import traceback
+
+# Load summary modules together, before long-running provider work. Late imports
+# after classification could otherwise load newer code than the active helpers.
+from . import narrative, relevance, campaign
 
 
 TRANSCRIBE_MODEL = "gpt-4o-transcribe-diarize"
@@ -257,7 +262,7 @@ def batches(text, limit=24000):
     return result
 
 
-def generate(instructions, text, model, cache_dir, response_format=None):
+def generation_request(instructions, text, model, cache_dir, response_format=None):
     payload = {"model": model, "instructions": instructions, "input": text,
                "store": False, "max_output_tokens": 5000}
     if response_format is not None:
@@ -266,6 +271,16 @@ def generate(instructions, text, model, cache_dir, response_format=None):
     key = hashlib.sha256(encoded).hexdigest()
     cache = cache_dir / (key + ".json")
     incomplete = cache_dir / "incomplete" / (key + ".json")
+    return encoded, cache, incomplete
+
+
+def generation_cached(instructions, text, model, cache_dir):
+    _, cache, incomplete = generation_request(instructions, text, model, cache_dir)
+    return cache.exists() or incomplete.exists()
+
+
+def generate(instructions, text, model, cache_dir, response_format=None):
+    encoded, cache, incomplete = generation_request(instructions, text, model, cache_dir, response_format)
     raw = (read_json(cache) if cache.exists() else
            read_json(incomplete) if incomplete.exists() else api("responses", encoded))
     if raw.get("status") != "completed":
@@ -314,6 +329,18 @@ def summarize(root, dest, model, backend="openai"):
     # Explicit allowlist prevents accidental ingestion of DM-only notes.
     context = "\n".join((root / "context/campaign" / name).read_text(encoding="utf-8")
                         for name in names)
+    from .campaign import name_reference, previous_recap, name_checks
+    metadata_object = json.loads(metadata)
+    spelling = name_reference(root, metadata_object)
+    spelling_checks = name_checks(spelling, transcript["segments"])
+    if spelling:
+        context += ("\nCanonical spelling reference only (does not establish events or acoustic identities): "
+                    + spelling + ". Crick and Cricket are distinct; do not conflate them. "
+                    "Use these spellings only when the dialogue establishes the referent. "
+                    "Uncertain phonetic matches require review, not silent transcript replacement.")
+    previous, previous_path = previous_recap(root, dest, metadata_object, backend)
+    if previous:
+        context += "\nReviewed previous session, prior history only; never current-session evidence:\n" + previous
     if len(context) + len(metadata) > MAX_CONTEXT_CHARS:
         raise ValueError("Campaign context and session metadata exceed 24,000 characters; condense them.")
     instructions = prompt + "\nCampaign reference data (not session evidence):\n" + context + "\nSession metadata:\n" + metadata
@@ -330,41 +357,50 @@ def summarize(root, dest, model, backend="openai"):
     for index, (batch, expected) in enumerate(extraction_batches, 1):
         print(f"Campaign relevance review: batch {index}/{len(extraction_batches)}", flush=True)
         task = EXTRACTION_TASK + "\nRequired source IDs for this batch: " + json.dumps(sorted(expected))
-        output = generate(instructions + task, batch, model, cache)
-        items.extend(recover_omitted_sources(output, expected))
-    selected, allowed, checks = select_evidence(items)
-    notes = batches(selected)
+        legacy = instructions + task
+        if generation_cached(legacy, batch, model, cache):
+            output = generate(legacy, batch, model, cache)
+            classified = recover_omitted_sources(output, expected)
+            missing = {source for item in classified if item.get("reason") == "unclassified_sources"
+                       for source in item["source_ids"]}
+            if missing:
+                print(f"Repairing classification for {len(missing)} source IDs with required per-source labels.", flush=True)
+                classified = [item for item in classified if item.get("reason") != "unclassified_sources"]
+                repaired = relevance.classify_sources(instructions, batch, missing, model, cache)
+                remaining = sum(len(item["source_ids"]) for item in repaired if item.get("reason") == "unclassified_sources")
+                print(f"Classification repair: {len(missing) - remaining} source IDs classified; {remaining} still unclassified.", flush=True)
+                classified.extend(repaired)
+        else:
+            classified = relevance.classify_sources(instructions, batch, expected, model, cache)
+        items.extend(classified)
+    _, allowed, checks = select_evidence(items)
     instructions += "\nRecap input SHA-256: " + hashlib.sha256(text.encode()).hexdigest()
-    recap = None
-    level = 0
-    if not notes:
-        recap = ("# Session recap\n\nNo campaign events were established for inclusion in this draft. "
-                 "See the separate manual-check draft for any topics withheld pending review.")
-    # Questions are retained separately, never compressed or fed into the tale.
-    for level in range(8):
-        if recap is not None:
-            break
-        final = len(notes) == 1
-        print("Generating final recap..." if final else
-              f"Reducing campaign notes: level {level + 1}, {len(notes)} batches", flush=True)
-        task = ("\nWrite the final recap using the required sections." if final else
-                "\nExtract compact chronological evidence notes from this partial session. "
-                "Preserve source IDs, outcomes, uncertainties, and all unresolved threads; "
-                "do not write a final recap yet. Aim for 600-900 words. Cite the minimum "
-                "1-3 exact supporting IDs per finding; do not repeat full source-ID inventories.")
-        outputs = []
-        for note in notes:
-            stage = "final recap" if final else f"note reduction level {level + 1}"
-            output = generate_cited(instructions + task, note, model, cache, stage)
-            outputs.append(output)
-        if final:
-            recap = outputs[0]
-            break
-        notes = batches("\n".join(outputs))
-    if recap is None:
-        raise ValueError("Summary reduction did not converge; cached intermediate responses are retained.")
+    recap, scene_coverage = narrative.build_story(instructions, transcript["segments"], allowed, model, cache)
+    if previous:
+        # A separate evidence mapping prevents reused segment numbers from
+        # making prior events appear to have current-session audio citations.
+        opening = generate_cited(
+            prompt + "\nWrite only a short Previously paragraph, at most 100 words, from this "
+            "reviewed previous recap. No heading, new events or current-session facts.",
+            previous, model, cache, "previous-session opening")
+        link = os.path.relpath(root / previous_path, summary_dir)
+        prior_number = metadata_object["session_number"] - 1
+        opening = re.sub(r"\[(c\d+:s\d+)\]",
+                         lambda m: f"[Session {prior_number}: {m[1]}]({link})", opening)
+        heading, _, body = recap.partition("\n")
+        recap = heading + "\n\n## Previously\n\n" + opening + "\n" + body
     transcript_hash = digest(transcript_path)
+    for suggestion in spelling_checks:
+        checks.append({"source_ids": suggestion["source_ids"], "category": "uncertain",
+                       "topic": "Possible name transcription error: " + suggestion["heard"],
+                       "question": "Check spelling against " + ", ".join(suggestion["candidates"])
+                                   + ". Similar spelling does not establish identity.",
+                       "reason": "name_spelling"})
     report = render_checks(checks, transcript["segments"], backend, transcript_hash)
+    if type(metadata_object.get("session_number")) is int and metadata_object["session_number"] > 1 and not previous:
+        report += ("\n## Previous-session continuity\n\nNo reviewed recap was available for the immediately "
+                   "preceding session. Previously was omitted. Review and promote that session's recap, "
+                   "then rerun this summary to incorporate its continuity.\n")
     unclassified = {source for item in items if item.get("reason") == "unclassified_sources"
                     for source in item["source_ids"]}
     report_hash = publish_checks(dest, summary_dir, report, {
@@ -375,16 +411,30 @@ def summarize(root, dest, model, backend="openai"):
         "unclassified_source_ids": sorted(unclassified),
         "classification_status": "partial" if unclassified else "complete",
     })
-    write(summary_dir / "recap.draft.md", "<!-- UNREVIEWED: verify facts and audience before sharing. -->\n\n" + recap + "\n")
+    warning = (f"Coverage is partial: {len(unclassified)} source segments could not be classified "
+               "and were withheld. See manual-check.draft.md before relying on this account.\n\n"
+               if unclassified else "")
+    save_json(summary_dir / "scene-coverage.draft.json", {
+        "schema_version": 1, "transcript_sha256": transcript_hash,
+        "method": "chronological_original_evidence_v2", "windows": scene_coverage,
+        "warning": "Window processing and valid citations do not establish factual support or completeness."})
+    write(summary_dir / "recap.draft.md", "<!-- UNREVIEWED: verify facts and audience before sharing. -->\n\n" + warning + recap + "\n")
     save_json(summary_dir / "provenance.json", {
         "model": model, "transcript_sha256": transcript_hash,
         "transcription_backend": backend,
         "reviewed_speaker_map": transcript.get("reviewed_speaker_map", {}),
         "prompt_sha256": digest(root / "prompts/recap.md"),
         "context_sha256": hashlib.sha256((context + metadata).encode()).hexdigest(),
-        "review_status": "unreviewed", "reduction_levels": level,
+        "review_status": "unreviewed", "reduction_levels": 0,
+        "narrative_method": "chronological_original_evidence_v2",
+        "scene_window_count": len(scene_coverage),
+        "previous_reviewed_recap": previous_path,
+        "previous_reviewed_sha256": digest(root / previous_path) if previous_path else None,
+        "name_reference": spelling,
+        "name_reference_file": "context/campaign/names.json" if spelling else None,
+        "name_spelling_check_count": len(spelling_checks),
         "context_policy": policy, "context_files": list(names),
-        "relevance_extraction_version": 1, "extraction_batches": len(extraction_batches),
+        "relevance_extraction_version": 2, "extraction_batches": len(extraction_batches),
         "manual_check_sha256": report_hash, "manual_check_count": len(checks),
         "unclassified_source_count": len(unclassified),
         "relevance_classification_status": "partial" if unclassified else "complete",
@@ -471,7 +521,13 @@ def main():
                     summarize(root, dest, model)
     except (ValueError, OSError, KeyError, TypeError) as exc:
         # Do not expose raw exception text: decoder errors can contain private input.
-        message = str(exc) if type(exc) in (ValueError, SummaryOutputLimit) else "Input or response is missing or malformed; check the stage files."
+        if type(exc) in (ValueError, SummaryOutputLimit):
+            message = str(exc)
+        else:
+            frames = [frame for frame in traceback.extract_tb(exc.__traceback__)
+                      if Path(frame.filename).parent == Path(__file__).parent]
+            location = f" at {Path(frames[-1].filename).name}:{frames[-1].lineno} ({frames[-1].name})" if frames else ""
+            message = f"{type(exc).__name__}{location}. Input/response processing failed; private exception details withheld."
         parser.exit(1, f"Error: {message}\n")
 
 

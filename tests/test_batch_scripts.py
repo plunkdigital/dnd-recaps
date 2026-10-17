@@ -20,6 +20,9 @@ class BatchScriptTests(unittest.TestCase):
         (self.root / "scripts/gpu_python.sh").write_text('''#!/usr/bin/env bash
 set -eu
 printf '%s\\n' "$*" >> "$BATCH_CALLS"
+if [[ "${3:-}" == "${MUTATE_STAGE:-unused}" ]]; then
+  printf '# changed during stage\\n' >> "$BATCH_MUTATE_FILE"
+fi
 if [[ "${3:-}" == "${FAIL_STAGE:-unused}" && "${4:-}" == "${FAIL_SESSION:-}" ]]; then
   exit 7
 fi
@@ -81,6 +84,38 @@ fi
         result = self.run_batch(FAIL_STAGE="gpu-check")
         self.assertEqual(result.returncode, 7)
         self.assertEqual(self.calls.read_text().splitlines(), ["-m dnd_recaps gpu-check"])
+
+    def test_summary_retry_skips_gpu_checks_audio_and_diarization(self):
+        result = self.run_batch(script="generate_recaps_gpu.sh", args=("--allow-cloud", "--summaries-only",
+                                "--from-session", "2", "--through-session", "3", "--continue-on-error"),
+                                FAIL_STAGE="summarize", FAIL_SESSION="session-002-there-goes-my-hero")
+        self.assertEqual(result.returncode, 1, result.stderr)
+        calls = self.calls.read_text().splitlines()
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(all(line.startswith("-m dnd_recaps summarize") for line in calls))
+        self.assertIn("session-003", calls[1])
+        run = next((self.root / "recordings/catalog/batch-runs").iterdir())
+        self.assertTrue((run / "implementation.sha256").is_file())
+
+    def test_implementation_change_stops_even_when_continue_on_error_is_set(self):
+        source = self.root / "src/dnd_recaps/narrative.py"
+        source.parent.mkdir(parents=True)
+        source.write_text("# original implementation\n")
+        result = self.run_batch(script="generate_recaps_gpu.sh", args=("--allow-cloud", "--summaries-only",
+                                "--continue-on-error"), MUTATE_STAGE="summarize", BATCH_MUTATE_FILE=str(source))
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(len(self.calls.read_text().splitlines()), 1)
+        self.assertIn("pipeline files changed", result.stdout)
+        status = next((self.root / "recordings/catalog/batch-runs").glob("*/status.tsv")).read_text()
+        self.assertIn("implementation-check\t86", status)
+
+    def test_invalid_end_session_or_reverse_range_starts_nothing(self):
+        for args in (("--through-session", "7"), ("--through-session",),
+                     ("--from-session", "4", "--through-session", "2")):
+            with self.subTest(args=args):
+                result = self.run_batch(script="generate_recaps_gpu.sh", args=("--allow-cloud", *args))
+                self.assertEqual(result.returncode, 2)
+                self.assertFalse(self.calls.exists())
 
 
 if __name__ == "__main__":

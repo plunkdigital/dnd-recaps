@@ -83,6 +83,10 @@ that repository, global settings, production services, or this project's scope.
   recap inputs. `session.json` can set `context_policy: recording_only` to read only
   the public premise in `overview.md`. First-batch recordings 1–3 use that policy;
   later recordings may use `campaign_history`. Do not infer missing continuity.
+  Both policies also permit session-bounded spellings from `names.json` and the
+  immediately preceding session's `recap.reviewed.md`. Never use a draft or a later
+  recap as prior history. Session 1 has no Previously section. Keep prior-session
+  citations qualified by session; identical segment numbers are not shared evidence.
 - Recheck official API documentation before changing model parameters, upload limits,
   or response formats. Sources and research dates belong in `docs/research.md`.
 - Never inspect, print, modify, or commit real `.env` files, credentials, or keys.
@@ -167,7 +171,8 @@ audio citations for historical notes or narrate old events as new-session events
 ## Current boundaries
 
 This is a local CLI, not hosted intake. It uses fixed overlapping audio chunks and
-recursive text summarization. No automatic identity resolution, silence-based chunk
+chronological transcript-window notes followed by one narrative pass. Bounded
+split recovery remains available for explicit output cutoffs. No automatic identity resolution, silence-based chunk
 boundaries, cross-track alignment, DM recap mode, publishing, or campaign-state merge exists.
 Optional CUDA ASR uses VAD for speech filtering, not silence-based audio chunk cuts.
 The cloud path is still serial and remote; local CUDA inference remains unverified

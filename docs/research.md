@@ -40,9 +40,10 @@ the sources, not claims that a source prescribes this software architecture.
   transitions may embellish the prose; invented scenery, dialogue, feelings, motives,
   and events may not. A compact reference appendix preserves useful campaign details
   without turning the main recap into a report.
-- Bound requests for multi-hour sessions. Summarize every batch and reduce notes
-  recursively; retain cached intermediate responses for audit and recovery. This can
-  still lose detail through compression, so end-of-session and ledger checks matter.
+- Bound requests for multi-hour sessions. Read retained original transcript in
+  chronological windows, then write from a compact outline in one narrative pass;
+  retain cached intermediate responses for audit and recovery. Repeated global
+  compression lost middle-session evidence in the first real draft and was replaced.
 - Keep player-safe context separate from DM secrets. Do not use outside adventure
   text to fill gaps: it can both fabricate events and reveal future story material.
 - Retain originals and uncertainty. Fixed chunks can cut sentences and duplicate
@@ -53,6 +54,59 @@ the sources, not claims that a source prescribes this software architecture.
 
 No pricing is hard-coded. No assumptions are made about the group's edition,
 published setting, session length, number of players, or recording method.
+
+## Recap quality and spelling hints, 2026-10-16
+
+Rechecked the official [Structured Outputs constraints](https://developers.openai.com/api/docs/guides/structured-outputs)
+before adding `maxItems: 3`, bounded block strings and empty heading reference
+arrays. Local checks distinguish uncited headings from factual prose and reject
+numeric citation leakage. These constraints cannot validate that a claim follows
+from its cited speech. The chronological-window and story-length checks are local
+quality safeguards, not claims prescribed by OpenAI documentation.
+
+Verified `hotwords` and its per-window prompting against the versioned
+[faster-whisper 1.2.1 implementation](https://github.com/SYSTRAN/faster-whisper/blob/v1.2.1/faster_whisper/transcribe.py).
+Use a short spelling reference for every decoding window of new CUDA chunks,
+including when previous decoded text is disabled. This is an ASR hint, not a
+guaranteed dictionary or reviewed correction. Keep existing segmentation and raw
+caches; changed hints must not silently regenerate evidence IDs. The cloud
+diarization model still does not accept this parameter. Name availability comes
+only from user-supplied table notes, with no published adventure lookup.
+
+## Saved runner failures, 2026-10-17
+
+The first repaired live batch still returned bracketed numeric markers and several
+paragraphs inside a single block, while another response exceeded the complete
+scene-note budget. Rechecked the official
+[Structured Outputs supported properties](https://developers.openai.com/api/docs/guides/structured-outputs#supported-schemas):
+string `pattern` and array `maxItems` are supported for the base model in use.
+Keep GPT-4.1 mini and the existing 5,000-token request cap. New schema patterns
+exclude square brackets and line breaks from each prose block. Compact scene
+requests allow at most four blocks, each at most 45 whitespace-delimited words and
+400 characters, with 1-3 numeric evidence references. Local checks independently
+enforce these limits, including during cutoff recovery. Invalid saved responses
+remain invalid; only a new bounded regeneration from original evidence can recover.
+These constraints do not prove semantic support or live story quality.
+
+The metadata archive flag and runner fingerprint are local workflow repairs, not
+provider API features. An archived preparation does not supply prior continuity;
+active duplicates remain errors. Hash checks detect source/prompt/context changes
+between stages and stop rather than mixing later CLI processes from different
+implementations. This is a stage-boundary guard, not an immutable environment.
+
+## Source classification repair, 2026-10-17
+
+The latest Session 1 cache replay found 30 non-JSON relevance responses among 74
+batches, with 1,980 IDs withheld overall. This is a format/coverage problem, not
+evidence that those sources concern unrelated chatter. Rechecked the official
+[Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs)
+for required object properties, enums and local `$defs` references. New relevance
+requests use a required key for each source ID, each holding category and review
+question, instead of free-form grouped event notes. Requests classify at most 32
+IDs while retaining the original surrounding batch as context. Completed valid
+legacy decisions survive; only unclassified legacy IDs need paid reclassification.
+Native output still receives local coverage, type and duplicate-key checks. These
+checks establish structural coverage, not relevance accuracy or event truth.
 
 ## Incomplete text responses, 2026-10-16
 

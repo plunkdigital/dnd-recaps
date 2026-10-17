@@ -62,7 +62,11 @@ Aim for about 600–1000 words of story, shorter for sparse evidence.
 
 For the final Markdown recap use these sections:
 # Session recap
-## Previously (an evocative read-aloud opening, about 150 words)
+## Previously (optional, at most 100 words, using only the supplied reviewed previous recap)
+Omit Previously entirely for Session 1 and whenever no reviewed previous recap is
+supplied. Never relabel the current session's opening scenes as previous events.
+Prior evidence references belong to the named earlier session, never the current
+recording. Keep this opening separate from the current session's evidence.
 ## The tale (chronological narrative with character moments and decisions woven in)
 End the tale at the actual stopping point; use a cliffhanger only if the session had one.
 ## At a glance
@@ -74,3 +78,9 @@ End the tale at the actual stopping point; use a cliffhanger only if the session
 ## Review notes
 ### Uncertainties and review questions
 ### Proposed campaign updates (with evidence; these require human review)
+
+Keep the appendix compact, about 200 words total; omit empty categories. Do not
+repeat the story as lists. Develop the beginning, middle and ending of the session
+in proportion to their consequences. Do not replace scenes with generic statements
+about fellowship, destiny or the atmosphere. Give each narrative paragraph only
+1-3 directly supporting citations, never a complete source inventory.
