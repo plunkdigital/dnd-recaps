@@ -139,8 +139,125 @@ request now returns Markdown blocks with source-number arrays bounded to supplie
 sources. Code appends original segment IDs. Questions use the same lookup; prior
 context uses a separate lookup. Canonical IDs remain in request text for cache binding.
 There is no string regex, prose quota, classification stage or automatic retry.
-Local checks still reject invalid types, out-of-range numbers, inline source markers
-and references to material withheld for manual review. These checks cannot establish
+Local checks still reject invalid types, out-of-range numbers and inline source
+markers. Shared references with review questions are annotated as described below.
+These checks cannot establish
 that the cited utterance actually supports the prose. The invalid cached response
 is preserved and cannot be reused unchanged. Live behavior of the new format remains
 unverified; all six assembled requests fit the existing byte ceiling.
+
+## Review questions are not whole-source exclusions, 2026-10-17
+
+The next completed live response used valid source numbers. One reference also
+appeared in a question about identity. The blanket ban on citing any question's
+sources rejected the entire recap, although an unresolved detail does not invalidate
+all events in the surrounding passage. The question and its shared IDs now remain
+visible in the manual report; code does not guess the answer or assert that the
+uncertain detail is absent. Prompt instructions still exclude unrelated conversation
+and material of unclear campaign relevance. Human review checks those semantics.
+
+The exact cached Session 1 response successfully completed local rendering and
+publication twice with network and secret loading disabled. Raw response bytes and
+human review files were unchanged. This establishes completion of this saved case,
+not story quality: its prose has 338 words, one block and 249 distinct references.
+Those output limitations remain visible; no new generation or approval occurred.
+
+## Compact dialogue and direct writing instructions, 2026-10-17
+
+The saved request used 274,538 input tokens. Its dialogue renderer repeated source
+IDs, decimal timestamps and labels for each tiny diarization span. The revised
+recap renderer emits one source header per segment and preserves speaker turns,
+without timing duplication. An independent comparison against all six normalized
+transcripts confirmed every word is retained. Session 1's numbered input decreased
+from 640,482 to 409,409 UTF-8 bytes; this is a byte measurement, not a token estimate.
+Complete requests now range from 162,312 to 427,779 bytes. A source hash preserves
+cache invalidation for timing and metadata edits too. Stale diarization words cannot
+override corrected parent text; uncertain attribution is explicitly unavailable.
+
+The [official GPT-4.1 prompting guide](https://developers.openai.com/cookbook/examples/gpt4-1_prompting_guide)
+was rechecked for long-context and instruction-following guidance. The prompt now
+centres on chronological scenes, a supported ending and relevant paragraph sources,
+with fewer repeated instructions and appendix headings. These are hypotheses for
+better generation, not a measured quality improvement. No model, API parameter,
+response schema, automatic retry or additional generation stage was introduced.
+
+## Live story evaluation, 2026-10-17
+
+The user authorized real text-generation runs with application runtime key loading.
+The compact-input GPT-4.1 mini request completed (144,518 input tokens, 1,982 output)
+but its draft misordered scenes, confused the bounty hunter with the suspect, omitted
+the final offer, and largely ignored canonical character names. An otherwise identical
+GPT-5.4 comparison improved scene coverage but still swapped opening identities and
+returned 897 source references. Neither result met the story-quality requirement.
+Both exact raw responses remain in the private Session 1 cache.
+
+Rechecked the official [GPT-5.4 model reference](https://developers.openai.com/api/docs/models/gpt-5.4)
+and [reasoning guide](https://developers.openai.com/api/docs/guides/reasoning).
+GPT-5.4 supports Responses, structured output, a 1,050,000-token context window and
+medium reasoning. Its default reasoning is none. Reasoning and visible output share
+`max_output_tokens`; the guide recommends starting with at least 25,000 tokens of
+headroom. The next comparison therefore used medium reasoning and that allowance,
+while retaining the same one-request architecture and incomplete-response rejection.
+Other model overrides retain their existing request settings. No sampling parameter,
+automatic retry, validation gate or extra generation stage was introduced.
+
+The prompt now emphasizes tracking the actor through dialogue, using canonical
+spellings consistently, withholding unresolved interpretations, and choosing a few
+decisive sources rather than listing every utterance. This is writing guidance, not
+a machine quota. The GPU runner accepts an explicit `--model`, so the verified
+choice can override old configuration without reading or modifying `.env`.
+At this stage the CLI fallback changed to GPT-5.4; existing settings still won.
+The larger model has higher token prices than the former mini default. Live output,
+not documentation or mocked tests, determines whether this change is adequate.
+
+Medium reasoning recovered correct opening identities, chronological consequential
+scenes and the final offer, but still selected large source lists and occasionally
+omitted a neighboring fragment needed to support a claim. The next prompt explicitly
+asks for the predicate, amount, condition and result rather than only a nearby noun.
+The writing prompt is repeated after the unabridged transcript. This is an empirical
+application of the [official long-context prompt-placement guidance](https://developers.openai.com/cookbook/examples/gpt4-1_prompting_guide#2-long-context),
+not a claim that GPT-4.1 guidance guarantees GPT-5.4 behavior. The fourth live result
+was then checked against the same source material. Source-list rendering uses ordinary Markdown footnotes so
+all original evidence remains available without interrupting the story. This is
+presentation, not evidence selection or a quality gate. Request and response hashes
+now make the exact generating cache directly inspectable from provenance.
+
+The fourth result still overclaimed a clue and omitted key citation fragments.
+Repeating the prompt did not settle these quality defects. A comparison with
+[GPT-6 Astra](https://developers.openai.com/api/docs/models/gpt-6-astra) therefore keeps
+the same complete input, prompt, medium reasoning, 25,000-token allowance and schema.
+Its official reference confirms Responses, structured output, medium reasoning and
+a 1,050,000-token window. It is a more expensive quality candidate, not an automatic
+fallback. The specific migration-guide URL failed to fetch twice; the fetched model
+reference and reasoning guide establish the parameters used here. No unsupported
+parameter or extra stage is needed for this text-only request.
+
+The GPT-6 Astra comparison completed with 146,169 input tokens and 4,410 output
+tokens, including 326 reasoning tokens. Its actual Session 1 draft passed the
+source/readability audit: correct actors and consequential scenes, an accurately
+supported ending, 976 tale words, a 184-word appendix, and 13 separate questions.
+All 20 paragraph/appendix source groups were inspected. Real and network-disabled
+reruns reproduced the exact cached draft, and raw response rendering matched it.
+The final CLI fallback is therefore `gpt-6-astra`, with existing configuration still
+having precedence and an explicit runner override available. The previous GPT-5.4
+fallback noted above was an intermediate experiment, not the final choice.
+
+This comparison is evidence for these recordings, not a general model benchmark
+or a guarantee of future prose accuracy. The user expanded verification to Sessions
+2 through 6; their complete-transcript results are recorded below. Human source-audio,
+audience and approval review remains required.
+
+The expanded batch also completed for Sessions 2-6. All six final drafts and their
+122 cited sections received transcript/source review; per-session private audits
+record findings and limits. Tales are approximately 920-1,100 words with compact
+appendices. Fifty-four manual questions remain pending, including Session 2's
+character-specific clue audience boundary. This is successful draft generation,
+not human approval or a claim of exhaustive spoiler filtering.
+
+All six safe, network-disabled CLI reruns reused the cached responses with zero
+API calls and identical outputs. Every request preserved the complete transcript's
+words and ordered source IDs; sizes were 171,023-436,422 bytes. Response rendering
+matched each saved draft exactly. Request/response/prompt/transcript/report/draft
+hashes, original audio manifests and preservation snapshots passed. The 87-test
+offline suite remains green. No new audio inference or source-audio listening was
+part of this text-generation evaluation.

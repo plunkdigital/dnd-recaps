@@ -72,16 +72,32 @@ questions use the same current-session numbers. Prior blocks have a separate loo
 from the reviewed predecessor and are disabled when no predecessor exists. The
 original IDs stay in request text, binding the lookup to cache identity. Code keeps
 prior evidence separate, qualifies its citations and writes the story and review report.
+Current paragraph citations appear as Markdown footnotes, with their original
+`[cNNNN:sNNNN]` lists in an Evidence section after the compact appendix. This moves
+references out of the reading flow without dropping or guessing any source IDs.
+The recap request uses one source header per segment and compact speaker turns,
+without repeating timestamps or IDs at every diarization span. All transcript words
+remain available; timestamps still appear in the local transcript and manual report.
+If corrected segment text no longer matches its derived speaker spans, the corrected
+text is sent with attribution unavailable instead of silently using the old wording.
+The full transcript file hash also enters the request, so edits to timing or other
+transcript fields invalidate the cache. Provenance records `compact_turns_v1`.
+The writing instructions and spelling reference are repeated after the full
+transcript to keep the task visible at the end of the long input. No dialogue is
+removed or summarized before the request.
 The model selects campaign material while writing, ignoring unrelated chatter and
 withholding ambiguous topics for manual review. This does not classify every segment
 or guarantee that every ambiguity, unsupported claim or spoiler was detected.
 
 The serialized request has a conservative 750,000-byte ceiling for the default
-GPT-4.1 mini's 1,047,576-token context window. All six current recordings fit. This is
+GPT-6 Astra's 1,050,000-token context window. All six current recordings fit. This is
 a byte ceiling, not a tokenizer estimate or a promise for smaller custom models.
 Oversized input fails before upload; split the recording explicitly. No text is
-silently dropped. The response allows 8,192 output tokens, with no paragraph length,
-word-count or scene-count constraints. Story length remains editorial guidance.
+silently dropped. GPT-6 Astra, GPT-5.4 and its `gpt-5.4-2026-03-05` snapshot use medium
+reasoning and a 25,000-token combined reasoning/output allowance. Other overrides retain the
+8,192-token allowance without a model-specific reasoning parameter. There are no
+paragraph length, word-count or scene-count constraints. Story length and a few
+decisive citations per paragraph remain editorial guidance, not rejection gates.
 
 The user is a player. Public campaign premise and user-supplied prior-session history
 can establish context, not unseen adventure events or DM secrets. The supplied
@@ -97,15 +113,19 @@ another file (relative to `--root`). No configuration is loaded by preparation/h
 The parser handles simple quoted/unquoted values and comments without shell execution
 or interpolation. Configuration values are never included in parse errors.
 
-`config/codex-test.env` is safe to inspect and contains no usable key. Agent-run
-checks must select it or synthetic temporary configurations; do not inspect or load
-the real `.env` to confirm credentials. Creating this configuration does not grant
-access to secrets, and no paid call is part of setup validation.
+`config/codex-test.env` is safe to inspect and contains no usable key. Automated
+checks must select it or synthetic temporary configurations. The user explicitly
+authorized agent-run live recap text generation on 2026-10-17, including application
+runtime loading of the existing API key with `--allow-cloud`. This does not authorize
+inspection, printing, copying, modification or exposure of `.env` contents or secret
+values. Do not load real configuration just to validate credentials. Platform
+restrictions still apply; no paid call is part of automated setup validation.
 
 The cache key hashes the entire request, including prompt, context, model, and
 input. The final draft checks cited ID existence, but factual support, completeness,
 and spoiler filtering still require human review. `provenance.json` describes the
-last successful draft generation; caches retain exact intermediate API responses.
+last successful draft generation, including the request hash, raw response cache
+path and response file hash; caches retain exact API responses.
 Responses requests use `store: false`; this is not a guarantee of zero provider
 retention. Check your account's data controls before sensitive processing.
 
@@ -133,8 +153,12 @@ code, with this format:
 The model sees the full recording, including unrelated conversation, in this text
 request. Filtering is an instruction to the writer, not a separate privacy filter.
 Do not copy personal information or possible secrets into review questions. The
-code checks that all question references exist and that flagged IDs are not cited
-in the story. This does not establish that the prose actually excluded the topic.
+code checks that all references exist. Questions may cite the same passage as a
+settled event, so shared IDs are recorded as `recap_source_ids` in each question
+and highlighted in the report. Overlap alone does not show that the story narrated
+the uncertain detail. The reviewer checks that unclear campaign material, unresolved
+claims and unrelated conversation were omitted; neither source existence nor a
+shared-source check can establish that semantic judgment.
 
 Generated `manual-check.draft.md` and `.json` live beside the selected backend's
 recap. A session `manual-check.md` index is created only if absent; it and `review.md`
@@ -147,8 +171,9 @@ without claiming complete source classification.
 ### Response validation and recovery
 
 Only completed, non-refused responses with valid JSON and known citations can
-publish new drafts. Current-story IDs must belong to this recording and cannot be
-flagged for manual review. Previously IDs must come from the reviewed predecessor;
+publish new drafts. Current-story IDs must belong to this recording. A question
+sharing an ID adds a manual review annotation rather than aborting the completed
+draft. Previously IDs must come from the reviewed predecessor;
 code qualifies them by session and links to that reviewed file. Uncertain topics
 are not narrative evidence. An empty current-story block array produces a plain no-established-events account. No word-count rejection or automatic paid retry occurs.
 
@@ -167,12 +192,14 @@ method and hashes. It is written last; failed provider/validation runs leave the
 previous successful recap/review outputs in place. Check exit status and provenance.
 
 ```bash
-./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --through-session 1
+./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --through-session 1 --model gpt-6-astra
 ```
 
 This skips all GPU audio stages. Finish edits and wait for any current writer before
 starting. After reviewing Session 1, run later summaries using `--from-session 2`;
 use `--through-session N` to process one recording before reviewing it for continuity.
+The explicit model overrides any older `RECAP_MODEL` in local configuration without
+changing that file. Without the flag, existing configuration wins over the CLI default.
 
 ### Evidence and approval
 

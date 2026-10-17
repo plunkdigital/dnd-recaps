@@ -94,8 +94,14 @@ that repository, global settings, production services, or this project's scope.
   This does not authorize agents to inspect its contents. Tests use synthetic
   values and `config/codex-test.env`, which contains setting names and placeholders
   only, never secret values or references that resolve to real secrets. Use that
-  file explicitly for any agent-run CLI check; never execute the default secret
-  loader to validate credentials. Keep recordings and generated content ignored.
+  file explicitly for automated checks; never execute the default secret loader
+  just to validate credentials. On 2026-10-17 the user explicitly authorized agents
+  to execute this repository's scripts and CLI for live recap text generation with
+  `--allow-cloud`, including application runtime loading of `OPENAI_API_KEY` from
+  the existing `.env`. This narrow permission supersedes the agent runtime-loading
+  restriction for those runs only. Never inspect, print, copy, modify or expose
+  `.env` contents or secret values. Automated tests still use synthetic credentials;
+  platform-enforced restrictions still apply. Keep generated content ignored.
 - The user also authorizes operator-run local diarization to load only `HF_TOKEN`
   from `.env` for gated model download. Agents still cannot inspect or indirectly
   load that protected file. Model access conditions must be accepted by the user;
@@ -149,7 +155,10 @@ audio citations for historical notes or narrate old events as new-session events
   `summarize` generates backend-specific `manual-check.draft.md`/`.json` files and
   creates a session `manual-check.md` index only if absent. Preserve that index and
   `review.md` as human-owned decision logs. Keep questions separate from the story;
-  validate source IDs and never cite flagged IDs in the current narrative.
+  validate source IDs and omit material whose campaign relevance is unclear.
+  Review questions may cite context that also supports settled events. A shared
+  source ID alone does not establish that the uncertain detail entered the story;
+  flag that overlap for human review instead of rejecting the entire recap.
 - Fantasy names, numbers, negation, crosstalk, music, and silence need special review.
   Mark uncertainty rather than guessing; aliases are suggestions, not corrections.
 - Capture exploration, social scenes, consequential combat outcomes, character

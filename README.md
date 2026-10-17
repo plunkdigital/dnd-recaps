@@ -79,7 +79,7 @@ spellings in manual checks. Hints improve the available context, not guaranteed 
 If transcription and diarization already finished, retry just Session 1's text work:
 
 ```bash
-./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --through-session 1
+./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --through-session 1 --model gpt-6-astra
 ```
 
 This skips GPU checks and audio inference. After reviewing Session 1, see
@@ -91,10 +91,13 @@ For an installed command, optionally use `python3 -m venv .venv`, activate it an
 `python3 -m pip install -e .`; then use `dnd-recaps` in place of the module command.
 Use `--root /path/to/dnd-recaps` before the subcommand when running elsewhere.
 
-For Codex checks, use `--env-file config/codex-test.env` before the subcommand.
+For automated Codex checks, use `--env-file config/codex-test.env` before the subcommand.
 This tracked file lists setting names with an empty key, not a reference resolving
 to your real key. It cannot authorize a live API call. Automated tests use synthetic
 settings and mocked requests; agents must never inspect the real `.env`.
+The user separately authorized agent-run live recap text requests with
+`--allow-cloud` and application runtime key loading on 2026-10-17; see
+[runtime configuration](docs/workflow.md#runtime-configuration).
 The loader accepts simple `KEY=value` assignments, optional `export`, quotes, and
 comments for the two supported names. It does not execute shell code, interpolate
 variables, or support multiline values.
@@ -146,7 +149,11 @@ the same inputs resumes work. There are no automatic network retries. A timeout
 can still incur a provider charge. Run one process per session at a time.
 
 The transcription model is `gpt-4o-transcribe-diarize` for speaker labels and segment
-times; the recap default is `gpt-4.1-mini` (override with `--model` or `RECAP_MODEL`).
+times; the recap default is `gpt-6-astra` with medium reasoning (override with `--model`
+or `RECAP_MODEL`). Existing configuration still takes precedence over this default.
+The GPU runner accepts `--model gpt-6-astra` to select it without editing `.env`.
+This model costs more per token than the former mini default; the change addresses
+observed failures on whole-session stories. See [live evaluation](docs/research.md#live-story-evaluation-2026-10-17).
 Account availability varies. Prepared chunks are mono 64 kbps MP3, about 20 minutes
 with five seconds of overlap. Overlap is retained in transcripts, so duplicate
 boundary dialogue needs review. Labels reset per chunk and do not prove identity.

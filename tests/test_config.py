@@ -84,6 +84,16 @@ class ConfigurationTests(unittest.TestCase):
             cli.load_environment(root / "config/codex-test.env")
             self.assertNotIn("OPENAI_API_KEY", os.environ)
 
+    def test_default_recap_model_and_process_override_without_secret_configuration(self):
+        self.config.write_text("OPENAI_API_KEY=fake-only\n", encoding="utf-8")
+        args = ["dnd-recaps", "--root", str(self.root), "--env-file", self.config.name,
+                "summarize", "fixture", "--allow-cloud"]
+        for settings, expected in (({}, "gpt-6-astra"), ({"RECAP_MODEL": "process-model"}, "process-model")):
+            with patch.dict(os.environ, settings, clear=True), patch.object(cli.sys, "argv", args), \
+                    patch.object(cli, "summarize") as summarize:
+                cli.main()
+                self.assertEqual(summarize.call_args.args[2], expected)
+
     def test_supplied_campaign_context_fits_request_budget(self):
         root = Path(__file__).resolve().parents[1]
         names = ("overview.md", "characters.md", "glossary.md", "state.md")

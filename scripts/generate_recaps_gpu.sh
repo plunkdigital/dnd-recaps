@@ -5,8 +5,9 @@ continue_on_error=false
 first_session=1
 last_session=6
 summaries_only=false
+recap_model=""
 usage() {
-  printf '%s\n' 'Usage: scripts/generate_recaps_gpu.sh --allow-cloud [--from-session 1-6] [--through-session 1-6] [--continue-on-error] [--summaries-only]' \
+  printf '%s\n' 'Usage: scripts/generate_recaps_gpu.sh --allow-cloud [--from-session 1-6] [--through-session 1-6] [--continue-on-error] [--summaries-only] [--model MODEL]' \
     'Local CUDA transcription and speaker separation; text recaps use the paid OpenAI API.'
 }
 while [[ "$#" -gt 0 ]]; do
@@ -14,6 +15,14 @@ while [[ "$#" -gt 0 ]]; do
     --allow-cloud) allow_cloud=true; shift ;;
     --continue-on-error) continue_on_error=true; shift ;;
     --summaries-only) summaries_only=true; shift ;;
+    --model)
+      if [[ "$#" -lt 2 || -z "$2" || "$2" == -* ]]; then
+        usage >&2
+        exit 2
+      fi
+      recap_model="$2"
+      shift 2
+      ;;
     --through-session)
       if [[ "$#" -lt 2 || ! "$2" =~ ^[1-6]$ ]]; then
         usage >&2
@@ -94,7 +103,12 @@ run_session() {
     case "$stage" in
       transcribe) arguments=(transcribe "$session_id" --backend cuda) ;;
       diarize) arguments=(diarize "$session_id") ;;
-      summarize) arguments=(summarize "$session_id" --transcript-backend cuda-diarized --allow-cloud) ;;
+      summarize)
+        arguments=(summarize "$session_id" --transcript-backend cuda-diarized --allow-cloud)
+        if [[ -n "$recap_model" ]]; then
+          arguments+=(--model "$recap_model")
+        fi
+        ;;
     esac
     printf '\n%s: %s (%s UTC)\n' "$session_id" "$stage" "$(date -u +%FT%TZ)"
     if "${runner[@]}" "${arguments[@]}"; then

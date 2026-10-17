@@ -244,6 +244,10 @@ def render(segments):
 def generation_request(instructions, text, model, cache_dir, response_format=None):
     payload = {"model": model, "instructions": instructions, "input": text,
                "store": False, "max_output_tokens": 8192}
+    if model in {"gpt-6-astra", "gpt-5.4", "gpt-5.4-2026-03-05"}:
+        # Long recordings need room to reconcile events before writing. Reasoning
+        # tokens share this limit with the story; incomplete output still fails.
+        payload.update(reasoning={"effort": "medium"}, max_output_tokens=25000)
     if response_format is not None:
         payload["text"] = {"format": response_format}
     encoded = json.dumps(payload, ensure_ascii=False).encode()
@@ -283,7 +287,7 @@ def summarize(root, dest, model, backend="openai"):
     if backend == "cuda-diarized":
         from .speakers import apply_reviewed_speakers
         transcript = apply_reviewed_speakers(root, dest, transcript)
-    text = render(transcript["segments"])
+    text = recap.transcript_input(transcript["segments"])
     if not text.strip():
         raise ValueError("Cannot summarize an empty transcript.")
     prompt = (root / "prompts/recap.md").read_text(encoding="utf-8")
@@ -316,10 +320,15 @@ def summarize(root, dest, model, backend="openai"):
         instructions += "\nOnly the active reviewed speaker_map applies. speaker_map_history records superseded corrections, not additional identities. Voice-match proposals are not approved identity evidence."
     cache = summary_dir / "cache"
     instructions += recap.TASK
+    transcript_hash = digest(transcript_path)
+    instructions += f"\nTranscript SHA-256: {transcript_hash}\n"
     text = recap.number_sources(text, [s["id"] for s in transcript["segments"]])
+    # Restate the writing task after the long data, without reducing the recording.
+    text += "\nEnd of recording. Apply these writing instructions to the full recording:\n" + prompt
+    text += "\nCanonical spelling reference only: " + spelling + "\n" + recap.TASK
     response_format = recap.response_format(len(transcript["segments"]), len(recap.citations(previous)))
     # The complete transcript is sent, with no model-generated selection or compression.
-    request_body, _, _ = generation_request(instructions, text, model, cache, response_format)
+    request_body, response_cache, _ = generation_request(instructions, text, model, cache, response_format)
     if len(request_body) > MAX_SUMMARY_INPUT_BYTES:
         raise ValueError("Complete recap input exceeds 750,000 UTF-8 bytes. Split the recording "
                          "explicitly before summarizing; no evidence was truncated or uploaded.")
@@ -333,7 +342,6 @@ def summarize(root, dest, model, backend="openai"):
                          lambda m: f"[Session {prior_number}: {m[1]}]({link})", opening)
         heading, _, body = story.partition("\n")
         story = heading + "\n\n## Previously\n\n" + opening + "\n" + body
-    transcript_hash = digest(transcript_path)
     report = recap.render_checks(checks, transcript["segments"], backend, transcript_hash)
     if type(metadata_object.get("session_number")) is int and metadata_object["session_number"] > 1 and not previous:
         report += ("\n## Previous-session continuity\n\nNo reviewed recap was available for the immediately "
@@ -344,14 +352,19 @@ def summarize(root, dest, model, backend="openai"):
         "transcription_backend": backend, "transcript_sha256": transcript_hash,
         "checks": checks,
     })
+    story = recap.evidence_footnotes(story)
     write(summary_dir / "recap.draft.md", "<!-- UNREVIEWED: verify facts and audience before sharing. -->\n\n" + story + "\n")
     save_json(summary_dir / "provenance.json", {
         "model": model, "transcript_sha256": transcript_hash,
+        "request_sha256": hashlib.sha256(request_body).hexdigest(),
+        "response_cache": str(response_cache.relative_to(dest)),
+        "response_sha256": digest(response_cache),
         "transcription_backend": backend,
         "reviewed_speaker_map": transcript.get("reviewed_speaker_map", {}),
         "prompt_sha256": digest(root / "prompts/recap.md"),
         "context_sha256": hashlib.sha256((context + metadata).encode()).hexdigest(),
         "review_status": "unreviewed", "narrative_method": "full_transcript_v2",
+        "transcript_input_format": "compact_turns_v1",
         "previous_reviewed_recap": previous_path,
         "previous_reviewed_sha256": digest(root / previous_path) if previous_path else None,
         "name_reference": spelling,
@@ -433,7 +446,7 @@ def main():
             if args.command == "transcribe":
                 transcribe(dest)
             else:
-                model = args.model or os.environ.get("RECAP_MODEL") or "gpt-4.1-mini"
+                model = args.model or os.environ.get("RECAP_MODEL") or "gpt-6-astra"
                 if args.transcript_backend != "openai":
                     summarize(root, dest, model, backend=args.transcript_backend)
                 else:

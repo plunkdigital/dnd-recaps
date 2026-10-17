@@ -128,7 +128,8 @@ class PipelineTests(unittest.TestCase):
         prior = self.root / "sessions/prior"
         cli.save_json(prior / "session.json", {"session_number": 1, "campaign": "test"})
         reviewed = prior / "summaries/recap.reviewed.md"
-        cli.write(reviewed, "The old bridge fell. [c0000:s0002]")
+        cli.write(reviewed, "The old bridge fell. [^current-1]\n\n## Evidence\n\n"
+                            "[^current-1]: [c0000:s0002]")
         reply = summary_reply("# Session recap\n\n## The tale\n\nThe key was accepted. [c0000:s0002]",
                               previously="The bridge had fallen. [c0000:s0002]")
         with patch.object(cli, "api", side_effect=reply), contextlib.redirect_stdout(io.StringIO()):
@@ -136,7 +137,8 @@ class PipelineTests(unittest.TestCase):
         recap = (self.dest / "summaries/recap.draft.md").read_text()
         self.assertIn("## Previously", recap)
         self.assertIn("[Session 1: c0000:s0002]", recap)
-        self.assertIn("accepted. [c0000:s0002]", recap)
+        self.assertIn("accepted. [^current-1]", recap)
+        self.assertIn("[^current-1]: [c0000:s0002]", recap)
         provenance = cli.read_json(self.dest / "summaries/provenance.json")
         self.assertEqual(provenance["previous_reviewed_sha256"], cli.digest(reviewed))
         self.assertEqual(provenance["previous_reviewed_recap"], "sessions/prior/summaries/recap.reviewed.md")
@@ -182,7 +184,10 @@ class PipelineTests(unittest.TestCase):
             cli.summarize(self.root, self.dest, "test-model")
         self.assertEqual(api.call_count, 1)
         payload = json.loads(api.call_args.args[1])
-        self.assertEqual(payload["input"], recap.number_sources(cli.render(segments), [s["id"] for s in segments]))
+        dialogue = recap.number_sources(recap.transcript_input(segments), [s["id"] for s in segments])
+        self.assertTrue(payload["input"].startswith(dialogue + "\nEnd of recording."))
+        self.assertIn((self.root / "prompts/recap.md").read_text(), payload["input"][len(dialogue):])
+        self.assertEqual(payload["input"].count(dialogue), 1)
         self.assertEqual(payload["text"]["format"]["name"], "session_recap")
 
     def test_cloud_flag_is_required_before_api_use(self):

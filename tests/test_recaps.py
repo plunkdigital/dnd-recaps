@@ -1,6 +1,7 @@
 """Whole-session recap behavior and failures, without audio or paid requests."""
 
 import contextlib
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -40,6 +41,22 @@ class RecapTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             cli.summarize(self.root, self.dest, "fixture", "cuda-diarized")
 
+    def test_reasoning_model_request_and_cache_are_separate_from_legacy_requests(self):
+        for model in ("gpt-6-astra", "gpt-5.4", "gpt-5.4-2026-03-05"):
+            with self.subTest(model=model):
+                encoded, cache, _ = cli.generation_request("instructions", "dialogue", model, self.out)
+                payload = json.loads(encoded)
+                self.assertEqual(payload["reasoning"], {"effort": "medium"})
+                self.assertEqual(payload["max_output_tokens"], 25000)
+                self.assertFalse(payload["store"])
+                legacy = dict(payload)
+                legacy.pop("reasoning")
+                legacy["max_output_tokens"] = 8192
+                self.assertNotEqual(cache.stem, hashlib.sha256(json.dumps(legacy, ensure_ascii=False).encode()).hexdigest())
+        encoded, _, _ = cli.generation_request("instructions", "dialogue", "gpt-4.1-mini", self.out)
+        self.assertNotIn("reasoning", json.loads(encoded))
+        self.assertEqual(json.loads(encoded)["max_output_tokens"], 8192)
+
     def test_one_request_caches_and_preserves_human_logs_and_raw_transcript(self):
         transcript = self.dest / "transcripts/cuda-diarized/transcript.json"
         original = transcript.read_bytes()
@@ -59,11 +76,15 @@ class RecapTests(unittest.TestCase):
         self.assertIn("20.00-24.00s", report)
         self.assertIn("not an exhaustive classification", report)
         self.assertNotIn("c0000:s0001", (self.out / "recap.draft.md").read_text())
-        self.assertEqual(cli.read_json(self.out / "provenance.json")["narrative_method"], "full_transcript_v2")
+        provenance = cli.read_json(self.out / "provenance.json")
+        self.assertEqual(provenance["narrative_method"], "full_transcript_v2")
+        raw = self.dest / provenance["response_cache"]
+        self.assertEqual(raw.stem, provenance["request_sha256"])
+        self.assertEqual(cli.digest(raw), provenance["response_sha256"])
 
-    def test_unknown_or_withheld_or_malformed_citations_fail_without_retries(self):
+    def test_unknown_or_malformed_citations_fail_without_retries(self):
         question = {"source_ids": ["c0000:s0001"], "topic": "Unclear", "question": "Campaign related?"}
-        for text in ("Invented [c9999:s9999]", "Withheld [c0000:s0001]",
+        for text in ("Invented [c9999:s9999]",
                      "Partial [c0000:s0000] [1-8]", "Bare c0000:s0000", "No references"):
             self.revise_prompt(text)
             with self.subTest(text=text), patch.object(cli, "api", side_effect=summary_reply(text, [question])) as api:
@@ -71,6 +92,50 @@ class RecapTests(unittest.TestCase):
                     self.run_summary()
                 self.assertEqual(api.call_count, 1)
                 self.assertFalse((self.out / "recap.draft.md").exists())
+
+    def test_review_question_can_share_a_source_with_a_settled_event(self):
+        question = {"source_ids": ["c0000:s0000"], "topic": "Identity",
+                    "question": "Who is the person mentioned in this passage?"}
+        with patch.object(cli, "api", side_effect=summary_reply(STORY, [question])) as api:
+            self.run_summary()
+            self.run_summary()
+        self.assertEqual(api.call_count, 1)
+        draft = (self.out / "recap.draft.md").read_text()
+        self.assertIn("Azlor opened the gate. [^current-1]", draft)
+        self.assertIn("[^current-1]: [c0000:s0000]", draft)
+        report = cli.read_json(self.out / "manual-check.draft.json")
+        self.assertEqual(report["checks"][0]["recap_source_ids"], ["c0000:s0000"])
+        self.assertIn("Also cited in recap", (self.out / "manual-check.draft.md").read_text())
+        self.assertIn("uncertain detail was omitted", (self.out / "manual-check.draft.md").read_text())
+
+    def test_evidence_footnotes_preserve_paragraph_sources_and_prior_scope(self):
+        story = ("# Session recap\n\n## Previously\n\n"
+                 "Old event. [Session 1: c0000:s0000](../prior/recap.reviewed.md)\n\n"
+                 "## The tale\n\nFirst event. [c0000:s0000] [c0001:s0009]\n\n"
+                 "Second event. [c0002:s0004]")
+        rendered = recap.evidence_footnotes(story)
+        body, evidence = rendered.split("## Evidence")
+        self.assertEqual(recap.citations(body), set())
+        self.assertEqual(recap.citations(evidence), recap.citations(story))
+        self.assertIn("First event. [^current-1]", body)
+        self.assertIn("Second event. [^current-2]", body)
+        self.assertIn("[^current-1]: [c0000:s0000] [c0001:s0009]", evidence)
+        self.assertIn("[^current-2]: [c0002:s0004]", evidence)
+        self.assertIn("[Session 1: c0000:s0000](../prior/recap.reviewed.md)", body)
+        self.assertEqual(recap.evidence_footnotes("No established events."), "No established events.")
+
+    def test_completed_single_block_with_many_sources_and_questions_is_reviewable(self):
+        segments = [{"id": f"c0000:s{i:04d}"} for i in range(4623)]
+        # Shape of the real response: one block, a broad source inventory and one
+        # source shared with a question. No size gate or invented replacement IDs.
+        numbers = list(range(1, 4624, 20)) + [530, 530]
+        data = {"recap_blocks": [{"markdown": "A settled event.\n\nA later scene.", "sources": numbers}],
+                "previously_blocks": [], "manual_checks": [
+                    {"sources": [511, 530, 988, 1084], "topic": "Identity", "question": "Who is this?"}]}
+        story, _, checks = recap.parse(json.dumps(data), segments, "")
+        self.assertEqual(recap.citations(story), {segments[i - 1]["id"] for i in numbers})
+        self.assertEqual(checks[0]["recap_source_ids"], ["c0000:s0529"])
+        self.assertIn("A settled event.\n\nA later scene.", story)
 
     def test_invalid_manual_questions_and_previous_context_never_publish(self):
         invalid = [
@@ -128,7 +193,51 @@ class RecapTests(unittest.TestCase):
         long = "# Session recap\n\n" + "The party crossed the threshold. " * 300 + "[c0000:s0000]"
         with patch.object(cli, "api", side_effect=summary_reply(long)):
             self.run_summary()
-        self.assertIn(long, (self.out / "recap.draft.md").read_text())
+        draft = (self.out / "recap.draft.md").read_text()
+        self.assertIn(long.replace("[c0000:s0000]", "[^current-1]"), draft)
+        self.assertIn("[^current-1]: [c0000:s0000]", draft)
+
+    def test_compact_input_preserves_words_and_speaker_changes_without_repeated_headers(self):
+        segments = [{"id": "c0000:s0000", "start": 10, "end": 19, "speaker": "unknown",
+                     "text": "I offer peace. No, the gate stays shut.", "speaker_spans": [
+                         {"speaker": "session:0", "speaker_name": "Player A", "text": "I offer"},
+                         {"speaker": "session:0", "speaker_name": "Player A", "text": "peace."},
+                         {"speaker": "session:1", "text": "No, the gate stays shut."}]}]
+        original = json.dumps(segments)
+        self.assertEqual(recap.transcript_input(segments),
+                         "[c0000:s0000] session:0 (Player A): I offer peace.\n"
+                         "session:1: No, the gate stays shut.\n")
+        self.assertEqual(json.dumps(segments), original)
+        self.assertEqual(recap.transcript_input([]), "")
+
+    def test_corrected_text_overrides_stale_spans_and_invalidates_summary_cache(self):
+        path = self.dest / "transcripts/cuda-diarized/transcript.json"
+        self.segments[0]["speaker_spans"] = [dict(self.segments[0], speaker_name="Unreviewed identity")]
+        cli.save_json(path, {"segments": self.segments})
+        with patch.object(cli, "api", side_effect=summary_reply(STORY)) as api:
+            self.run_summary()
+            self.segments[0]["text"] = "Azlor did not open the gate."
+            cli.save_json(path, {"segments": self.segments})
+            self.run_summary()
+            self.assertEqual(api.call_count, 2)
+            supplied = json.loads(api.call_args.args[1])["input"]
+        self.assertIn("Azlor did not open the gate.", supplied)
+        self.assertNotIn("Azlor opened the gate.", supplied)
+        self.assertNotIn("Unreviewed identity", supplied)
+        self.assertIn("speaker attribution unavailable", supplied)
+        self.assertEqual(cli.read_json(path)["segments"], self.segments)
+
+    def test_transcript_timing_change_invalidates_cache_and_updates_review_timestamps(self):
+        question = {"source_ids": ["c0000:s0001"], "topic": "Unclear", "question": "Campaign related?"}
+        with patch.object(cli, "api", side_effect=summary_reply(STORY, [question])) as api:
+            self.run_summary()
+            self.segments[1].update(start=25, end=28)
+            cli.save_json(self.dest / "transcripts/cuda-diarized/transcript.json", {"segments": self.segments})
+            self.run_summary()
+        self.assertEqual(api.call_count, 2)
+        report = (self.out / "manual-check.draft.md").read_text()
+        self.assertIn("25.00-28.00s", report)
+        self.assertNotIn("20.00-24.00s", report)
 
     def test_source_numbers_use_exact_ids_even_with_gaps_and_different_chunks(self):
         segments = [{"id": "c0003:s0025"}, {"id": "c0012:s0008"}]

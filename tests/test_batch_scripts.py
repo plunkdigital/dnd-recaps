@@ -109,6 +109,20 @@ fi
         status = next((self.root / "recordings/catalog/batch-runs").glob("*/status.tsv")).read_text()
         self.assertIn("implementation-check\t86", status)
 
+    def test_explicit_model_is_forwarded_only_to_summary(self):
+        result = self.run_batch(script="generate_recaps_gpu.sh",
+                                args=("--allow-cloud", "--through-session", "1", "--model", "fixture-model"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        calls = self.calls.read_text().splitlines()
+        self.assertTrue(calls[-1].endswith("--model fixture-model"))
+        self.assertTrue(all("--model" not in call for call in calls[:-1]))
+
+    def test_missing_model_value_starts_nothing(self):
+        for tail in (("--model",), ("--model", ""), ("--model", "--summaries-only")):
+            result = self.run_batch(script="generate_recaps_gpu.sh", args=("--allow-cloud", *tail))
+            self.assertEqual(result.returncode, 2)
+            self.assertFalse(self.calls.exists())
+
     def test_invalid_end_session_or_reverse_range_starts_nothing(self):
         for args in (("--through-session", "7"), ("--through-session",),
                      ("--from-session", "4", "--through-session", "2")):

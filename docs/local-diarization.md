@@ -79,14 +79,14 @@ the batch. Without these options the original runner still starts at Session 1
 and stops at the first session failure. Offline stub-command tests cover these
 paths. The 2026-10-16 run completed all five audio stages but every summary failed;
 see the [output review](archive/RUNNER_OUTPUT_REVIEW_2026-10-17.md). Repairs have offline
-regressions; a repaired live recap run is still unverified.
+regressions; see [current project state](PROJECT_STATE.md) for live recap verification.
 
 ### Retry completed audio without GPU work
 
 The summary repair does not need new audio inference. To regenerate only Session 1:
 
 ```bash
-./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --through-session 1
+./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --through-session 1 --model gpt-6-astra
 ```
 
 This skips both GPU/model preflight checks and every transcription/diarization
@@ -95,6 +95,7 @@ OpenAI. The summarizer reads the full transcript in one request and returns the
 story and separate review questions. Classification repairs and scene windows are
 retired; their caches stay preserved. The first direct recap needs one new paid text
 request. Identical direct reruns reuse that response. No audio inference is repeated.
+The explicit model flag overrides older local model settings without changing `.env`.
 See [response validation and recovery](workflow.md#response-validation-and-recovery).
 
 Review the new Session 1 draft and record reviewer/date and corrections in
@@ -102,7 +103,7 @@ Review the new Session 1 draft and record reviewer/date and corrections in
 summaries if they should incorporate that continuity. Then retry Sessions 2-6:
 
 ```bash
-./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --from-session 2 --continue-on-error
+./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --from-session 2 --continue-on-error --model gpt-6-astra
 ```
 
 Each later session uses only a reviewed immediate predecessor. An unattended run
