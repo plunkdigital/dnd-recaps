@@ -103,3 +103,53 @@ class SummaryLimitTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "network failure"):
                 relevance.generate_cited("Write", self.source, "fixture", self.cache, "final recap")
         self.assertEqual(api.call_count, 1)
+
+    def test_short_cutoff_matches_live_failure_and_does_not_split(self):
+        raw = cutoff()
+        raw["usage"] = {"output_tokens": 294, "output_tokens_details": {"reasoning_tokens": 0}}
+        with patch.object(cli, "api", return_value=raw) as api:
+            for _ in range(2):
+                with self.assertRaisesRegex(cli.SummaryShortOutput, "294/5000"):
+                    relevance.generate_cited("Scene", self.source, "fixture", self.cache, "scene window 4", compact=True)
+        self.assertEqual(api.call_count, 1)
+        self.assertEqual(list(self.cache.glob("*.json")), [])
+        self.assertEqual(cli.read_json(next((self.cache / "incomplete").glob("*.json"))), raw)
+
+    def test_completed_older_word_regex_scene_is_reused_without_provider_call(self):
+        instructions, source, mapping = relevance.citation_transport("Scene", self.source, compact=True)
+        old_format = relevance.narrative_response_format(mapping, compact=True)
+        old_format["schema"]["properties"]["blocks"]["items"]["properties"]["markdown"]["pattern"] = r"^([^\s\[\]]+[ \t]+){0,44}[^\s\[\]]+$"
+        _, cache, _ = cli.generation_request(instructions, source, "fixture", self.cache, old_format)
+        raw = response(json.dumps({"blocks": [{"markdown": "The gate opened.", "evidence": [1]}]}))
+        cli.save_json(cache, raw)
+        before = cache.read_bytes()
+        with patch.object(cli, "api", side_effect=AssertionError("No provider call allowed")):
+            rendered = relevance.generate_cited("Scene", self.source, "fixture", self.cache, "scene window 1", compact=True)
+        self.assertEqual(rendered, "The gate opened. [c0000:s0000]")
+        self.assertEqual(cache.read_bytes(), before)
+        self.assertEqual(len(list(self.cache.glob("*.json"))), 1)
+
+    def test_old_short_incomplete_does_not_poison_the_simplified_schema(self):
+        instructions, source, mapping = relevance.citation_transport("Scene", self.source, compact=True)
+        old_format = relevance.narrative_response_format(mapping, compact=True)
+        old_format["schema"]["properties"]["blocks"]["items"]["properties"]["markdown"]["pattern"] = r"^([^\s\[\]]+[ \t]+){0,44}[^\s\[\]]+$"
+        _, _, diagnostic = cli.generation_request(instructions, source, "fixture", self.cache, old_format)
+        old = cutoff()
+        old["usage"] = {"output_tokens": 227}
+        cli.save_json(diagnostic, old)
+        completed = response(json.dumps({"blocks": [{"markdown": "A completed finding.", "evidence": [1]}]}))
+        with patch.object(cli, "api", return_value=completed) as api:
+            result = relevance.generate_cited("Scene", self.source, "fixture", self.cache, "scene window 4", compact=True)
+        self.assertEqual(api.call_count, 1)
+        self.assertIn("A completed finding", result)
+        sent = json.loads(api.call_args.args[1])
+        self.assertEqual(sent["text"]["format"]["schema"]["properties"]["blocks"]["items"]["properties"]["markdown"]["pattern"],
+                         r"^[^\[\]\r\n]+$")
+        self.assertEqual(cli.read_json(diagnostic), old)
+
+    def test_full_budget_exhaustion_still_gets_bounded_split_recovery(self):
+        raw = cutoff()
+        raw["usage"] = {"output_tokens": 5000}
+        state = {"splits": 3}
+        with patch.object(cli, "api", return_value=raw), self.assertRaisesRegex(ValueError, "bounded recovery"):
+            relevance.generate_cited("Scene", self.source, "fixture", self.cache, "scene window 4", state, compact=True)

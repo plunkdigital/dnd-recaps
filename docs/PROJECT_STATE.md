@@ -5,12 +5,19 @@ Updated 2026-10-17. Development state only; campaign canon belongs in
 
 ## Current phase
 
-Latest direct Session 1 failure: cached replay found 30 non-JSON relevance responses
-and 1,980 withheld IDs. The path now preserves valid old classifications and repairs
-only unclassified IDs with strict required per-source labels, at most 32 per request.
-New batches use that schema directly. All 74 original batch caches remain reusable;
-84 additional small repair requests are needed for this cache set. No live requests
-were made by the agent. See [direct failure repair](SUMMARY_FAILURE_PLAN.md).
+The latest user run completed all 84 classification repairs and scene windows 1-3,
+then failed through a cutoff split tree in window 4. Saved usage shows only
+227-327 output tokens despite a 5,000-token cap. The repeated-word schema regex is
+implicated. Provider-side word counting was removed; local 45-word/400-character,
+paragraph and citation checks remain enforced. Short incomplete responses now stop
+without evidence splitting. Partial text is never used. See the
+[scene decoding repair](SCENE_DECODING_PLAN.md).
+
+Read-only resume verified reuse of all 74 legacy batches, all 84 structured repair
+responses and the three completed scenes. The next paid work starts at scene window
+4 of 23. No classification repair needs paying for again under identical inputs.
+Fresh live completion is still unverified. Earlier classification changes are
+recorded in the [direct failure repair](SUMMARY_FAILURE_PLAN.md).
 
 The historical generic exception has no recorded traceback and was not reproduced
 with current files. Summary modules now load together at CLI startup, removing a
@@ -59,7 +66,7 @@ Sessions 1-3 event history, and all player recaps exclude DM files.
 
 ## Verification
 
-- 131 offline tests passed with the project `.venv`, using synthetic evidence and
+- 135 offline tests passed with the project `.venv`, using synthetic evidence and
   mocked providers. Shell syntax, documentation links and Git whitespace passed.
 - All five actual failed scene-response shapes remain rejected and unmodified.
   Read-only current-context replay reuses 66/50/27 relevance requests for Sessions

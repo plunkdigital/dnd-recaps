@@ -176,8 +176,9 @@ size and prevents omitted/duplicate source assignments in schema-conforming outp
 Local validation still rejects incomplete/malformed maps and duplicate JSON keys;
 uncertain or unusable results remain withheld for review, never guessed. These
 additional text requests incur charges unless cached. In the latest Session 1
-cache set, 41 batches contain 1,980 unclassified IDs, requiring 84 small repair
-requests under the 32-ID cap. All 74 original batch responses remain reusable.
+legacy cache set, 41 batches contained 1,980 unclassified IDs, repaired by 84 small
+requests under the 32-ID cap. Those repair responses are now cached and reusable,
+along with all 74 original batch responses.
 Incomplete provider responses never become successful evidence or drafts. A
 narrative response explicitly cut off by its output-token limit can use the bounded
 recovery described below; other incomplete responses and network failures stop.
@@ -235,8 +236,11 @@ at most 1,600 characters. Headings use empty evidence arrays and receive no cita
 The wire schema's string pattern excludes square brackets and line breaks in block
 prose. Separate paragraphs therefore need separate evidence arrays; heading blocks
 remain separate too. Scene requests additionally constrain `maxItems: 4`, each
-block's text to 400 characters and a pattern of at most 45 whitespace-separated
-words, with nonempty evidence. The same limits are validated locally. A failed
+block's text to 400 characters, with nonempty evidence. Word counts are enforced
+locally at 45 per block and 180 per scene. The earlier provider-side repeated-word
+regex is implicated in short incomplete responses in the user run and was removed;
+the simple no-brackets/no-line-breaks pattern remains. New output aims for 25-35
+words per block to leave headroom below the local limits. A failed
 scene size/shape gets the existing single recovery attempt from original evidence,
 not a truncation or redistribution of the invalid response's citations. Compact
 constraints also survive bounded output-cutoff recovery. Old invalid caches are
@@ -261,6 +265,10 @@ Responses whose status is not completed are preserved under that backend's
 entries. These files are private diagnostics, never usable notes or recaps. The
 adapter recognizes only `status: incomplete` with
 `incomplete_details.reason: max_output_tokens` as a recoverable output cutoff.
+If reported usage is below 4,500 of the configured 5,000 output tokens, the adapter
+instead reports a short incomplete response and stops without splitting evidence.
+The reported reason alone does not demonstrate that the configured budget ran out.
+This avoids repeating an unchanged decoding constraint through a costly split tree.
 It reports a safe reason rather than printing private response text. Other reasons,
 missing reasons, failed responses, and network errors still stop the stage.
 

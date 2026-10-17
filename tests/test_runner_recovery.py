@@ -35,7 +35,10 @@ class OvernightRecoveryTests(unittest.TestCase):
         properties = schema["items"]["properties"]
         self.assertEqual(properties["evidence"]["minItems"], 1)
         for length in (46, 98):
-            self.assertIsNone(re.fullmatch(properties["markdown"]["pattern"], "word " * (length - 1) + "word"))
+            text = "word " * (length - 1) + "word"
+            # Word counting is deliberately local, not a constrained-decoder regex.
+            self.assertIsNotNone(re.fullmatch(properties["markdown"]["pattern"], text))
+            self.assertIsNone(relevance.render_evidence_blocks(blocks(text), mapping, compact=True))
         self.assertIsNotNone(re.fullmatch(properties["markdown"]["pattern"], "word " * 44 + "word"))
         maximum = {"blocks": [{"markdown": "word " * 44 + "word", "evidence": [1, 2, 3]} for _ in range(4)]}
         rendered = relevance.render_evidence_blocks(json.dumps(maximum), mapping, compact=True)

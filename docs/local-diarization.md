@@ -96,11 +96,17 @@ confirmed all existing relevance requests for Sessions 3, 5 and 6 still match;
 Sessions 2 and 4 need fresh relevance requests under current context. Completed
 provider responses are preserved; identical new requests are cached normally.
 Unclassified IDs in those legacy responses now trigger small structured repair
-requests instead of being permanently lost to the story. Session 1's latest cache
-requires 84 such requests for 1,980 IDs. New or uncached batches use strict labels
+requests instead of being permanently lost to the story. Session 1's earlier cache
+needed 84 such requests for 1,980 IDs; the user has now completed those repairs.
+New or uncached batches use strict labels
 directly. Valid cached categories and all audio stages are preserved. Direct CLI
 runs preload summary modules before classification; unexpected failures report
 their exception type and safe code location without private exception values.
+The latest scene repair reuses the 84 completed classification repairs and the
+first three scene responses. With identical inputs, fresh paid work resumes at
+window 4 of 23. No GPU work is needed. Word limits remain locally enforced, while
+the problematic provider-side word-count regex has been removed. Responses marked
+incomplete despite stopping far below the token cap now stop without a split tree.
 
 Review the new Session 1 draft and record reviewer/date and corrections in
 `review.md`. Save an approved copy beside it as `recap.reviewed.md` before later

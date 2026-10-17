@@ -30,6 +30,10 @@ class SummaryOutputLimit(ValueError):
     """A provider-declared output cutoff; partial text is never usable evidence."""
 
 
+class SummaryShortOutput(ValueError):
+    """An incomplete response stopped before its configured output-token cap."""
+
+
 def load_environment(path, allowed_names=None):
     """Load simple dotenv assignments at runtime without executing shell content.
 
@@ -288,6 +292,13 @@ def generate(instructions, text, model, cache_dir, response_format=None):
         details = raw.get("incomplete_details")
         reason = details.get("reason") if isinstance(details, dict) else None
         if raw.get("status") == "incomplete" and reason == "max_output_tokens":
+            usage = raw.get("usage") or {}
+            tokens = usage.get("output_tokens")
+            if type(tokens) is int and 0 <= tokens < 4500:
+                raise SummaryShortOutput(
+                    f"Provider reported max_output_tokens after only {tokens}/5000 output tokens. "
+                    "This is not demonstrated token-budget exhaustion; evidence was not split. "
+                    "Diagnostic response preserved; no new draft published.")
             raise SummaryOutputLimit("Summary reached its output-token limit. Partial text was preserved for diagnostics, not used.")
         reason_label = "content_filter" if reason == "content_filter" else "not reported or not recoverable"
         raise ValueError(f"Summary response did not complete (reason: {reason_label}). "
@@ -521,7 +532,7 @@ def main():
                     summarize(root, dest, model)
     except (ValueError, OSError, KeyError, TypeError) as exc:
         # Do not expose raw exception text: decoder errors can contain private input.
-        if type(exc) in (ValueError, SummaryOutputLimit):
+        if type(exc) in (ValueError, SummaryOutputLimit, SummaryShortOutput):
             message = str(exc)
         else:
             frames = [frame for frame in traceback.extract_tb(exc.__traceback__)

@@ -108,6 +108,25 @@ legacy decisions survive; only unclassified legacy IDs need paid reclassificatio
 Native output still receives local coverage, type and duplicate-key checks. These
 checks establish structural coverage, not relevance accuracy or event truth.
 
+## Short incomplete scene responses, 2026-10-17
+
+The subsequent user run completed classification repair and three scene windows.
+Window 4 and its split recovery responses reported `max_output_tokens`, but actual
+usage was only 294, 327, 307 and 227 output tokens against a 5,000-token request cap.
+Partial strings repeatedly approached the constrained 45-word boundary. That
+implicates the repeated-word regex in constrained decoding; it does not establish
+the provider's internal failure mechanism. Input splitting repeated the same grammar
+and did not resolve it. No partial text was promoted to evidence.
+
+Rechecked the official [Structured Outputs guide](https://developers.openai.com/api/docs/guides/structured-outputs).
+The repair removes provider-side word counting, preserves the simpler single-line
+string pattern, and retains local 45-word/400-character limits and citation checks.
+Completed older-schema scenes are reusable only under identical input/instruction/
+evidence mappings and current validation. Old incomplete diagnostics remain separate
+and do not poison the new schema identity. A reported cutoff far below the configured
+token cap now stops without automatic evidence splitting. This is a local recovery
+policy informed by the observed usage, not a documented provider error guarantee.
+
 ## Incomplete text responses, 2026-10-16
 
 Follow-up: narrative JSON was only requested through instructions, which allowed

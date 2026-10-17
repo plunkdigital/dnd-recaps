@@ -137,9 +137,9 @@ def citation_transport(instructions, source, compact=False):
 def narrative_response_format(mapping, compact=False):
     if not mapping:
         raise ValueError("Narrative generation requires source evidence references.")
-    # Compact blocks have at most 45 whitespace-delimited words. Four blocks
-    # bound the complete prose to 180 words and rendered output below 2,400 chars.
-    pattern = r"^([^\s\[\]]+[ \t]+){0,44}[^\s\[\]]+$" if compact else r"^[^\[\]\r\n]+$"
+    # Count words locally. The old repeated-token regex is implicated in short
+    # incomplete responses despite ample output-token budget.
+    pattern = r"^[^\[\]\r\n]+$"
     result = {"type": "json_schema", "name": "narrative_evidence_blocks", "strict": True,
             "schema": {"type": "object", "additionalProperties": False, "required": ["blocks"],
                        "properties": {"blocks": {
@@ -203,12 +203,29 @@ def render_evidence_blocks(output, mapping, compact=False):
 
 
 def generate_cited(instructions, source, model, cache, stage, recovery=None, compact=False):
-    from .cli import generate, SummaryOutputLimit
+    from .cli import generate, generation_request, read_json, SummaryOutputLimit
 
     if recovery is None:
         recovery = {"splits": 0}
     transported, text, mapping = citation_transport(instructions, source, compact=compact)
     response_format = narrative_response_format(mapping, compact=compact)
+    if compact:
+        # Completed old scenes are still valid evidence under identical inputs
+        # and mappings. Keep their raw bodies and identities; skip old failures.
+        legacy_format = json.loads(json.dumps(response_format))
+        legacy_format["schema"]["properties"]["blocks"]["items"]["properties"]["markdown"]["pattern"] = r"^([^\s\[\]]+[ \t]+){0,44}[^\s\[\]]+$"
+        _, legacy_cache, _ = generation_request(transported, text, model, cache, legacy_format)
+        if legacy_cache.exists():
+            raw = read_json(legacy_cache)
+            if raw.get("status") == "completed" and not any(
+                    part.get("type") == "refusal" for item in raw.get("output", []) for part in item.get("content", [])):
+                previous = "\n".join(part["text"] for item in raw.get("output", []) if item.get("type") == "message"
+                                     for part in item.get("content", []) if part.get("type") == "output_text")
+                rendered = render_evidence_blocks(previous, mapping, compact=True)
+                if rendered is not None:
+                    return rendered
+        transported += ("\nFor new compact output, aim for 25-35 words per block, finishing the finding "
+                        "well before the 45-word/400-character local limits. Do not pad blocks to the limits.")
     try:
         output = generate(transported, text, model, cache, response_format=response_format)
     except SummaryOutputLimit:
