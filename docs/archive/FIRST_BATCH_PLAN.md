@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # First recording batch
 
 User confirmed chronology and requested transcription and recaps on 2026-10-16.

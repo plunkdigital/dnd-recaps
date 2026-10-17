@@ -56,8 +56,9 @@ Summarization excludes unrelated table chatter and withholds topics whose campai
 relevance is unclear. Open the session's `manual-check.md` for links to generated
 review drafts containing source IDs, timestamps, and questions. Keep your decisions
 in that index or `review.md`; generated `manual-check.draft.md` files beside each
-backend's recap are replaced on rerun. The selection pass uses additional cached
-OpenAI text requests. See [review and rerun behavior](docs/workflow.md#campaign-relevance-and-manual-checks).
+backend's recap are replaced on rerun. The complete transcript and permitted context go to one cached OpenAI text request,
+which returns the story and review questions together. There are no classification
+batches, scene reductions or automatic prose retries. See [review and rerun behavior](docs/workflow.md#campaign-relevance-and-manual-checks).
 
 After checking evidence and spoilers, copy the draft to `summaries/recap.reviewed.md`,
 record the reviewer/date in `review.md`, and update `context/campaign/state.md`
@@ -72,8 +73,8 @@ Session numbers and campaign names in `session.json` determine this relationship
 Canonical name spellings now live separately in `context/campaign/names.json`, so
 early recordings can use your supplied names without importing later events. New
 GPU ASR chunks receive spelling hints. Existing cached transcripts retain their
-words and IDs; summarization uses the same name reference and flags likely spelling
-errors in manual checks. Hints improve the available context, not guaranteed accuracy.
+words and IDs; summarization uses the same name reference and asks the model to flag uncertain
+spellings in manual checks. Hints improve the available context, not guaranteed accuracy.
 
 If transcription and diarization already finished, retry just Session 1's text work:
 

@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # GPU decoder compatibility fix
 
 User failure reported 2026-10-16. CUDA discovery and diarization initialization

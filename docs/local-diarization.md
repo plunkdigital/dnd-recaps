@@ -78,7 +78,7 @@ repeat audio stages. No human review decisions or campaign state are applied by
 the batch. Without these options the original runner still starts at Session 1
 and stops at the first session failure. Offline stub-command tests cover these
 paths. The 2026-10-16 run completed all five audio stages but every summary failed;
-see the [output review](RUNNER_OUTPUT_REVIEW_2026-10-17.md). Repairs have offline
+see the [output review](archive/RUNNER_OUTPUT_REVIEW_2026-10-17.md). Repairs have offline
 regressions; a repaired live recap run is still unverified.
 
 ### Retry completed audio without GPU work
@@ -91,22 +91,11 @@ The summary repair does not need new audio inference. To regenerate only Session
 
 This skips both GPU/model preflight checks and every transcription/diarization
 command. It reads the existing diarized transcript and sends text/context to
-OpenAI. Updated narrative schemas create new request identities. Read-only replay
-confirmed all existing relevance requests for Sessions 3, 5 and 6 still match;
-Sessions 2 and 4 need fresh relevance requests under current context. Completed
-provider responses are preserved; identical new requests are cached normally.
-Unclassified IDs in those legacy responses now trigger small structured repair
-requests instead of being permanently lost to the story. Session 1's earlier cache
-needed 84 such requests for 1,980 IDs; the user has now completed those repairs.
-New or uncached batches use strict labels
-directly. Valid cached categories and all audio stages are preserved. Direct CLI
-runs preload summary modules before classification; unexpected failures report
-their exception type and safe code location without private exception values.
-The latest scene repair reuses the 84 completed classification repairs and the
-first three scene responses. With identical inputs, fresh paid work resumes at
-window 4 of 23. No GPU work is needed. Word limits remain locally enforced, while
-the problematic provider-side word-count regex has been removed. Responses marked
-incomplete despite stopping far below the token cap now stop without a split tree.
+OpenAI. The summarizer reads the full transcript in one request and returns the
+story and separate review questions. Classification repairs and scene windows are
+retired; their caches stay preserved. The first direct recap needs one new paid text
+request. Identical direct reruns reuse that response. No audio inference is repeated.
+See [response validation and recovery](workflow.md#response-validation-and-recovery).
 
 Review the new Session 1 draft and record reviewer/date and corrections in
 `review.md`. Save an approved copy beside it as `recap.reviewed.md` before later
@@ -139,7 +128,7 @@ decoder constructions from 100 to one. Crop times were 0.723 seconds versus 0.05
 seconds including preload. These numbers measure synthetic audio IO only; no
 real-recording embedding speedup or speaker-quality improvement is established.
 All 54 offline tests pass, including waveform delivery and safe preload failure.
-See the [performance checklist](DIARIZATION_SPEED_PLAN.md).
+See the [performance checklist](archive/DIARIZATION_SPEED_PLAN.md).
 
 An already-running diarization process retains its original code. Later session
 processes in the shell batch load the updated wrapper automatically. Let the active

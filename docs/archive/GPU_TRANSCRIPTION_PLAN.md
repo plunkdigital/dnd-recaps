@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # GPU transcription
 
 User request, 2026-10-16: use the local GPU to reduce transcription time.

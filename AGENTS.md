@@ -148,8 +148,8 @@ audio citations for historical notes or narrate old events as new-session events
   never resolve relevance using outside adventure lore or guesses.
   `summarize` generates backend-specific `manual-check.draft.md`/`.json` files and
   creates a session `manual-check.md` index only if absent. Preserve that index and
-  `review.md` as human-owned decision logs. Questions must bypass narrative reduction;
-  validate batch source-ID coverage and never cite withheld IDs in campaign notes.
+  `review.md` as human-owned decision logs. Keep questions separate from the story;
+  validate source IDs and never cite flagged IDs in the current narrative.
 - Fantasy names, numbers, negation, crosstalk, music, and silence need special review.
   Mark uncertainty rather than guessing; aliases are suggestions, not corrections.
 - Capture exploration, social scenes, consequential combat outcomes, character
@@ -171,9 +171,11 @@ audio citations for historical notes or narrate old events as new-session events
 ## Current boundaries
 
 This is a local CLI, not hosted intake. It uses fixed overlapping audio chunks and
-chronological transcript-window notes followed by one narrative pass. Bounded
-split recovery remains available for explicit output cutoffs. No automatic identity resolution, silence-based chunk
-boundaries, cross-track alignment, DM recap mode, publishing, or campaign-state merge exists.
+one full-transcript recap request that returns the story and separate review questions.
+No classification batches, intermediate prose reduction, recursive recovery or automatic
+rewrites exist. Preserve complete responses and source checks; do not add prose quotas.
+No automatic identity resolution, silence-based chunk boundaries, cross-track alignment,
+DM recap mode, publishing, or campaign-state merge exists.
 Optional CUDA ASR uses VAD for speech filtering, not silence-based audio chunk cuts.
 The cloud path is still serial and remote; local CUDA inference remains unverified
 in this agent runtime because no GPU is visible. Do not claim GPU utilization or

@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Sessions 2 onward overnight batch
 
 Authorized 2026-10-16. Reuse the existing GPU batch runner; skip Session 1.

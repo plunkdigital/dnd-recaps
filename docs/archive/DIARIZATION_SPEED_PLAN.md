@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Diarization embedding performance
 
 2026-10-16: user reports first-session ASR completes in about 323 seconds;

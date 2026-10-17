@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Automatic campaign relevance review
 
 Authorized 2026-10-16: implement the separate manual-check deliverable.

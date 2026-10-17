@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Enforce narrative response schema
 
 2026-10-16: live narrative output omitted required evidence arrays; its rewrite

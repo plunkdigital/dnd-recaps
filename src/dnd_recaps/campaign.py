@@ -1,8 +1,6 @@
 """Time-bounded spelling hints and explicit reviewed prior-session continuity."""
 
 import json
-import difflib
-import re
 
 
 def name_reference(root, metadata):
@@ -58,22 +56,3 @@ def previous_recap(root, dest, metadata, backend):
             if text.strip():
                 return text, str(path.relative_to(root))
     return "", None
-
-
-def name_checks(spelling, segments):
-    """Suggest likely spelling errors without changing source words or identity."""
-    words = set(re.findall(r"\b[A-Za-z]{4,}\b", spelling))
-    known = {word.casefold() for word in words}
-    found = {}
-    for segment in segments:
-        for word in re.findall(r"\b[A-Z][a-z]{3,}\b", segment["text"]):
-            if word.casefold() in known:
-                continue
-            candidates = sorted(name for name in words if
-                                difflib.SequenceMatcher(None, word.casefold(), name.casefold()).ratio() >= 0.72)
-            if candidates:
-                key = (word, tuple(candidates))
-                found.setdefault(key, []).append(segment["id"])
-    return [{"heard": word, "candidates": list(candidates), "source_ids": sorted(set(ids)),
-             "status": "unreviewed_spelling_suggestion"}
-            for (word, candidates), ids in sorted(found.items())]

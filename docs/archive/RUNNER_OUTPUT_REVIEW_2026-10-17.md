@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Overnight runner output review
 
 Reviewed 2026-10-17. Run: `gpu-20261016T214043Z-IWmI1h`.
@@ -26,8 +28,8 @@ remains unsuccessful against these live saved responses.
 | 5: Mary's Pub | Passed | Passed | First scene window and recovery put multiple paragraphs in one cited block |
 | 6: Dwarf Dungeon | Passed | Passed | First scene window exceeded the 2,400-character compact-note limit |
 
-Evidence: [stage status](../recordings/catalog/batch-runs/gpu-20261016T214043Z-IWmI1h/status.tsv)
-and [runner log](../recordings/catalog/batch-runs/gpu-20261016T214043Z-IWmI1h/run.log).
+Evidence: [stage status](../../recordings/catalog/batch-runs/gpu-20261016T214043Z-IWmI1h/status.tsv)
+and [runner log](../../recordings/catalog/batch-runs/gpu-20261016T214043Z-IWmI1h/run.log).
 These local artifacts are deliberately ignored by Git.
 
 ## Findings requiring repair before another unattended run
@@ -37,21 +39,21 @@ These local artifacts are deliberately ignored by Git.
    respectively. Both are invalid under the current contract. Session 5's two
    responses each used a single block containing multiple paragraphs. The strict
    API schema permits those strings, while local validation rejects them at
-   [the renderer](../src/dnd_recaps/relevance.py:98). The retry did not repair the
+   `the renderer`. The retry did not repair the
    observed issue. Keep claim-level citations; do not salvage these responses by
    stripping markers or distributing citations across paragraphs without evidence.
 2. **The compact-note contract is only partly enforced.** Session 6 returned five
    individually valid cited blocks totaling 490 whitespace-delimited prose words
    and 3,350 rendered characters. The prompt requests at most 180 words, but there
    is no total-output constraint or compact-note recovery. The hard limit at
-   [scene extraction](../src/dnd_recaps/narrative.py:49) correctly stopped publication.
+   `scene extraction` correctly stopped publication.
    Session 3 also overshot the requested word count. A retry must address both
    total size and evidence structure; increasing a cutoff alone does not establish
    a compact, grounded outline.
 3. **Archived preparation metadata is treated as active chronology.** Both
    `sessions/interrupted-session-003-dark-cauldron/session.json` and the canonical
    Session 3 identify the same campaign/session number. The broad directory scan
-   in [previous-recap selection](../src/dnd_recaps/campaign.py:37) counts both before
+   in `previous-recap selection` counts both before
    checking for reviewed recaps, blocking Session 4 even when neither supplies one.
    Preserve the interrupted artifacts; active-session selection needs an explicit
    boundary rather than deleting the backup or arbitrarily choosing one match.

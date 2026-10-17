@@ -90,7 +90,7 @@ class ConfigurationTests(unittest.TestCase):
         context = "\n".join((root / "context/campaign" / name).read_text(encoding="utf-8")
                             for name in names)
         metadata = (root / "templates/session.json").read_text(encoding="utf-8")
-        self.assertLessEqual(len(context) + len(metadata), cli.MAX_CONTEXT_CHARS)
+        self.assertLessEqual(len((context + metadata).encode("utf-8")), cli.MAX_SUMMARY_INPUT_BYTES)
 
 
 if __name__ == "__main__":

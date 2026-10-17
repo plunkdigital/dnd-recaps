@@ -62,24 +62,21 @@ promote a draft or modify campaign state. DM files remain excluded.
 This includes the separately authorized, spoiler-labelled tracked DM reference.
 The reference is stored for explicit DM-reference work only; it is not background
 context for player recap generation or media chronology.
-Metadata and context have a combined 24,000-character cap, accommodating the supplied
-Sessions 1–3 character history without truncation. Relevance extraction uses
-transcript batches capped at 8,000 characters. Chronological scene extraction reads
-retained original transcript in 24,000-character windows. Grouped relevance prose is not reused as narrative evidence. Each window
-produces at most four factual blocks, each at most 45 words and 400 characters,
-for at most 180 words of compact scene notes (a 2,400-character local limit),
-with exact supporting utterances rather than all the window's IDs. The combined
-outline has an explicit 64,000-character cap and feeds one final story request.
-An oversized single line raises an explicit error.
-No input is silently truncated. Every distinct source ID in each extraction batch
-must be accounted for exactly once as campaign, unrelated, or uncertain in validated
-JSON text. Cached legacy extractions remain readable; new requests require one
-schema-keyed classification per source (see recovery below). Only
-retained campaign segments enter chronological notes and the final story;
-questions remain in a separate collection. No repeated global reduction is used.
-Provider responses must be completed and contain text. Classification is model judgment, not a semantic
-guarantee; human review remains necessary. This extra selection pass adds cached,
-paid text requests, including for transcripts that fit a single batch.
+The complete transcript and permitted context go to one Responses request. There
+is no classification pass, intermediate scene outline, recursive reduction, numeric
+citation remapping or automatic rewrite. The response contains three fields:
+`recap_markdown`, `previously_markdown` and `manual_checks`. Code keeps prior evidence
+separate, qualifies its citations and writes the current story and review report.
+The model selects campaign material while writing, ignoring unrelated chatter and
+withholding ambiguous topics for manual review. This does not classify every segment
+or guarantee that every ambiguity, unsupported claim or spoiler was detected.
+
+The serialized request has a conservative 750,000-byte ceiling for the default
+GPT-4.1 mini's 1,047,576-token context window. All six current recordings fit. This is
+a byte ceiling, not a tokenizer estimate or a promise for smaller custom models.
+Oversized input fails before upload; split the recording explicitly. No text is
+silently dropped. The response allows 8,192 output tokens, with no paragraph length,
+word-count or scene-count constraints. Story length remains editorial guidance.
 
 The user is a player. Public campaign premise and user-supplied prior-session history
 can establish context, not unseen adventure events or DM secrets. The supplied
@@ -119,188 +116,59 @@ Topic words alone do not establish relevance. Out-of-character planning, campaig
 rulings, retcons, and corrections can matter; an unrelated joke does not become a
 campaign event merely because a player or the DM said it.
 
-When context does not settle relevance, omit that material provisionally from the
-recap and retain a review question through extraction and reduction. At completion,
-provide `sessions/<session-id>/manual-check.md` alongside the drafts, separate from
-the narrative. Use one entry per ambiguous topic, combining repeated references:
+When relevance is unclear, the model omits the material provisionally and supplies
+a neutral review question with source IDs. Names and possible audience issues can
+also need review. The generated report uses transcript timestamps calculated by
+code, with this format:
 
-| Segment IDs | Recording timestamps | Neutral topic description | Why relevance is unclear / question | Decision and reviewer/date |
+| Segment IDs | Recording timestamps | Neutral topic | Review question | Decision and reviewer/date |
 | --- | --- | --- | --- | --- |
-| Existing cited IDs only | Start/end from transcript | Minimal description | What the reviewer needs to decide | Pending |
+| Existing IDs | Start/end from transcript | Minimal description | What to check | Pending |
 
-Do not invent entries before reviewing a recording. If a complete review finds no
-ambiguous topics, state that explicitly; an unfinished review must remain marked
-incomplete. Avoid copying personal details or possible secrets into this document;
-use a neutral description and source pointers where an audience check is needed.
-The user reviews the document after processing, marking each item include, exclude,
-or unresolved. Record accepted corrections and evidence in the session's `review.md`;
-only resolved, supported campaign material may enter a revised recap. Keep unresolved
-items out of the tale and preserve their questions for later review.
+The model sees the full recording, including unrelated conversation, in this text
+request. Filtering is an instruction to the writer, not a separate privacy filter.
+Do not copy personal information or possible secrets into review questions. The
+code checks that all question references exist and that flagged IDs are not cited
+in the story. This does not establish that the prose actually excluded the topic.
 
-`summarize` now creates the session's `manual-check.md` as a human-owned index and
-decision log, with links to backend-specific reports. It never overwrites an existing
-index. Generated reports live next to that backend's recap as
-`manual-check.draft.md` and `manual-check.draft.json`; those drafts are replaced on
-rerun, so keep your decisions in the session index or `review.md`. Only use the
-report link for a backend you have actually run; absent reports are not completed
-reviews. Source timestamps in Markdown come directly from the transcript, not
-model arithmetic. Repeated identical questions combine source references.
+Generated `manual-check.draft.md` and `.json` live beside the selected backend's
+recap. A session `manual-check.md` index is created only if absent; it and `review.md`
+remain human-owned. Keep decisions, reviewer/date and corrections there. Draft
+reports are replaced on rerun and never applied automatically to campaign state.
+No reported questions means only that the model reported none, not a completed
+human review. The JSON records `method: full_transcript_v1` and pending human review,
+without claiming complete source classification.
 
-Questions are stored outside chronological scene notes and do not enter story inputs.
-If any batch flags a repeated source ID as uncertain or unrelated, campaign notes
-using it are withheld conservatively. Intermediate and final citations must refer
-only to retained campaign evidence. If an otherwise valid classification omits
-source IDs, the code marks those IDs uncertain with reason `unclassified_sources`,
-withholds them, and adds a manual question for each affected batch. It never guesses
-their relevance or silently treats them as unrelated. The augmented result still
-must pass complete source-ID coverage validation. The report lists the omitted
-segment count and explicitly marks model classification partial; JSON and provenance
-record this status and the unclassified count/IDs. Cached omissions are handled
-without regenerating the request. A completely empty classification withholds the
-whole batch. Independently validated groups can be retained when other groups
-contain malformed fields, duplicate or unknown IDs. Every group touching a source
-that is disputed or referenced by an invalid group is withheld in full; no winner
-is selected. Invalid JSON or an unusable response structure withholds the entire
-batch. An invalid extra item without usable source pointers also withholds the
-whole batch if its conflict cannot otherwise be located. These cases are flagged
-with `classification_issues` in the generated review JSON, not treated as valid
-campaign evidence. All returned/augmented items still pass strict source-ID coverage
-validation before use. Reports explicitly disclose partial or invalid model
-classification. Valid legacy classifications are preserved. Unclassified IDs from
-cached legacy responses now receive bounded structured reclassification requests,
-with the original batch for context. Already-valid categories are not regenerated.
-New batches use this strict classification format directly, without paying for an
-unconstrained legacy extraction first. Each request has at most 32 required source
-keys, each with a category enum and a short review question. This bounds response
-size and prevents omitted/duplicate source assignments in schema-conforming output.
-Local validation still rejects incomplete/malformed maps and duplicate JSON keys;
-uncertain or unusable results remain withheld for review, never guessed. These
-additional text requests incur charges unless cached. In the latest Session 1
-legacy cache set, 41 batches contained 1,980 unclassified IDs, repaired by 84 small
-requests under the 32-ID cap. Those repair responses are now cached and reusable,
-along with all 74 original batch responses.
-Incomplete provider responses never become successful evidence or drafts. A
-narrative response explicitly cut off by its output-token limit can use the bounded
-recovery described below; other incomplete responses and network failures stop.
-Invalid narrative citations get at most one cached regeneration from the same
-validated evidence before stopping. The invalid draft is not fed back as evidence.
-Each ID must have its own brackets; ranges, shorthand, bare references, and grouped
-IDs are rejected even when the same response contains a valid citation. No range
-expansion, guessed ID replacement, or validation bypass is performed. Recovery is
-an additional paid text request when its response is not already cached; network
-errors and incomplete provider responses do not trigger citation-format recovery.
-All-unrelated or all-uncertain inputs produce a short no-established-events draft
-and the completed review report rather than an invented story. A valid ID does not
-prove factual support, nor can code ensure every off-topic remark was detected.
+### Response validation and recovery
 
-Provenance is written last, recording extraction version, report count/hash, recap
-hash, and transcript hash. A failed provider/validation run leaves previous successful
-outputs in place; compare provenance and exit status before treating files as current.
-The review document states extraction complete and human review pending only after
-all batches and narrative validation succeed. Human decisions are not automatically
-applied to evidence or campaign state.
+Only completed, non-refused responses with valid JSON and known citations can
+publish new drafts. Current-story IDs must belong to this recording and cannot be
+flagged for manual review. Previously IDs must come from the reviewed predecessor;
+code qualifies them by session and links to that reviewed file. Uncertain topics
+are not narrative evidence. An empty story field produces a plain no-established-
+events account. No word-count rejection or automatic paid retry occurs.
 
-The new prompt/stage instructions invalidate old summary requests while preserving
-ASR and diarization caches. Identical reruns reuse new extraction and narrative
-requests. If the batch had already entered `summarize` before this change, let it
-finish and then rerun only that session's summary after it has no active writer:
+Raw responses are preserved under the existing content-addressed `cache/`; incomplete
+or refused responses are diagnostic files under `cache/incomplete/`. Validation
+failures preserve responses and stop without publishing new drafts. Identical
+requests reuse cached failures as well as successes, so rerunning unchanged input
+cannot repair a bad response. Inspect the diagnostic and correct the prompt, input
+or model as appropriate; those changes create a different request identity.
+
+Migration needs no audio work or source-ID changes. Old classification, scene and
+reduction caches remain preserved but are no longer read. The direct request is
+new paid text work. Old `scene-coverage.draft.json` files describe the retired method;
+they are not updated or consumed. Consult `provenance.json` for the last successful
+method and hashes. It is written last; failed provider/validation runs leave the
+previous successful recap/review outputs in place. Check exit status and provenance.
 
 ```bash
-./scripts/gpu_python.sh -m dnd_recaps summarize session-001-spice-bag --transcript-backend cuda-diarized --allow-cloud
+./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --through-session 1
 ```
 
-Subsequent summary processes in the existing shell batch pick up the new workflow.
-No GPU transcription or diarization needs repeating to generate these review files.
-
-### Narrative output limits
-
-Narrative requests now use a code-owned citation transport. The source's exact
-canonical IDs map to short request-local handles such as `[E1]`. The model returns
-JSON text blocks containing `markdown` and an `evidence` array of integers. Code
-checks each reference against that request's mapping and appends canonical
-`[cNNNN:sNNNN]` citations. It rejects strings, ranges, booleans, duplicates, unknown
-numbers, and inline markers/IDs in block prose. Factual blocks require references;
-headings and explicit `Not established` placeholders may be uncited. Strictly valid
-legacy Markdown with canonical citations can still pass the existing validator.
-
-The mapping's hash enters the request instructions, preventing cached numeric
-references from being rebound to different source IDs. Raw JSON responses stay
-unchanged in caches; rendered Markdown carries canonical citations into subsequent
-scene notes and final drafts. Numbers have meaning only inside one request.
-Narrative requests now also send Responses `text.format` with `type: json_schema`
-and `strict: true`. The schema requires `blocks`, `markdown` and `evidence`, rejects
-extra properties, and constrains evidence to arrays of at most three integers between
-1 and the current mapping's size; local validation requires references for prose.
-Each prose block contains one paragraph or appendix bullet with 1-3 references and
-at most 1,600 characters. Headings use empty evidence arrays and receive no citations.
-The wire schema's string pattern excludes square brackets and line breaks in block
-prose. Separate paragraphs therefore need separate evidence arrays; heading blocks
-remain separate too. Scene requests additionally constrain `maxItems: 4`, each
-block's text to 400 characters, with nonempty evidence. Word counts are enforced
-locally at 45 per block and 180 per scene. The earlier provider-side repeated-word
-regex is implicated in short incomplete responses in the user run and was removed;
-the simple no-brackets/no-line-breaks pattern remains. New output aims for 25-35
-words per block to leave headroom below the local limits. A failed
-scene size/shape gets the existing single recovery attempt from original evidence,
-not a truncation or redistribution of the invalid response's citations. Compact
-constraints also survive bounded output-cutoff recovery. Old invalid caches are
-preserved, and changed schema/transport creates new narrative request identities.
-Local validation remains mandatory, including duplicate and inline-marker checks; schema adherence does not
-establish factual support. Provider refusals are preserved privately and stop the
-request without automatic retries or fallback to unconstrained text. Model support
-for Structured Outputs is required; GPT-4.1 mini supports it. The relevance response
-format now uses required per-source labels; valid legacy cache entries are retained.
-Old narrative caches remain preserved but new narrative requests have new identities.
-Old relevance caches remain intact; updated prompt/context creates new identities.
-Citation checks establish
-reference validity, not whether each claim is supported; human review still applies.
-
-The request cap remains 5,000 output tokens, with the existing model and API
-parameters unchanged. Scene notes ask for minimal supporting citations rather
-than exhaustive repeated ID lists. Prompt, name and continuity changes invalidate
-relevant text request identities; old cache files remain preserved.
-
-Responses whose status is not completed are preserved under that backend's
-`summaries/.../cache/incomplete/<request-hash>.json`, separate from completed cache
-entries. These files are private diagnostics, never usable notes or recaps. The
-adapter recognizes only `status: incomplete` with
-`incomplete_details.reason: max_output_tokens` as a recoverable output cutoff.
-If reported usage is below 4,500 of the configured 5,000 output tokens, the adapter
-instead reports a short incomplete response and stops without splitting evidence.
-The reported reason alone does not demonstrate that the configured budget ran out.
-This avoids repeating an unchanged decoding constraint through a costly split tree.
-It reports a safe reason rather than printing private response text. Other reasons,
-missing reasons, failed responses, and network errors still stop the stage.
-
-For an explicit narrative cutoff, split the original validated evidence at a whole
-line boundary, produce compact cited notes for each half, then retry the requested
-reduction or final story from those completed notes. Each narrative request permits
-at most three splits across the entire recovery tree. Citation checks still apply;
-the old eight-level global reduction loop is no longer used. If evidence cannot be split with
-references on both sides, or recovery is exhausted, stop without publishing a new
-recap/review pair. Never use the provider's partial text or silently truncate input.
-This recovery does not apply to JSON relevance extraction.
-
-Split/recombine and any citation recovery are additional paid text requests unless
-cached. Repeated identical requests reuse completed and incomplete diagnostic
-caches, so a known cutoff is not resubmitted before splitting. A previously uncached
-failure may need one new request before its cause can be diagnosed. Incomplete
-diagnostics with other reasons keep the same request blocked on rerun; investigate
-the reason rather than automatically retrying it.
-
-The updated runner hashes Python pipeline, scripts, prompt and player-context files
-before preflight and checks for changes before/after stages. Its ignored run directory
-includes `implementation.sha256`. Changes stop the batch even with
-`--continue-on-error`, preventing later sessions from silently switching code. A
-stage already in progress cannot be retroactively frozen; its output stays available
-for inspection. Finish edits before starting a run. No running job is terminated
-by a development edit; the runner checks at stage boundaries.
-
-After audio stages complete, use `--summaries-only` to skip CUDA checks, ASR and
-diarization entirely. `--from-session` and `--through-session` select an inclusive
-range from 1 to 6. The normal full-audio runner defaults are preserved. Summary
-retries still require `--allow-cloud` and may incur text charges. Do not run two
-writers for the same session. See [recovery commands](local-diarization.md#retry-completed-audio-without-gpu-work).
+This skips all GPU audio stages. Finish edits and wait for any current writer before
+starting. After reviewing Session 1, run later summaries using `--from-session 2`;
+use `--through-session N` to process one recording before reviewing it for continuity.
 
 ### Evidence and approval
 
@@ -358,17 +226,11 @@ stable alias registry and the current session mapping, enrolls a sufficient voic
 sample, and records corrections. `propose-speakers` refreshes suggestions without
 neural inference. Only active reviewed mappings enter labelled transcripts or recaps.
 
-## Recap quality and spelling checks, 2026-10-16
+## Recap quality and spelling hints
 
-For substantial retained recordings (at least 3,000 spoken-word tokens), the final
-story must have a separate The tale section with 600-1,100 words. With six or more
-scene windows it must cite retained evidence from the opening, middle and ending
-thirds. These are minimum structural checks, not proof of complete or faithful
-coverage. One quality rewrite from the same evidence is allowed, then failure stops
-publication. `scene-coverage.draft.json` records each window's source IDs, selected
-note references and final recap references for review. Partial relevance
-classification is visibly disclosed above the draft. No uncertain source is guessed
-back into the story to fill a gap.
+Story length, chronological balance and pacing are prompt guidance for human review,
+not machine quotas. The complete original transcript remains available to the writer.
+There is no automatic quality rewrite or scene-coverage artifact in the direct method.
 
 `context/campaign/names.json` contains spellings and explicitly supplied nicknames,
 not historical events, personalities or hidden identity links. `from_session` limits
@@ -377,11 +239,9 @@ availability. Crick and Cricket stay distinct. New CUDA chunks receive a bounded
 with a notice when current hints differ. For a genuine retranscription use a new
 session ID and re-review references. Do not delete caches to force it.
 
-Summaries also use these spellings to resolve clearly established referents. A local
-capitalized-word similarity check adds unapproved spelling suggestions to manual
-checks; similarity never corrects the transcript or proves identity. This heuristic
-can miss errors or flag ordinary words. Existing transcripts are not retroactively
-fixed. Record accepted corrections in normalized JSON and `review.md`, preserving
+Summaries also use these spellings to resolve clearly established referents and
+ask the model to flag uncertain names for review. No fuzzy spelling matcher changes
+source text or guesses identity. Existing transcripts are not retroactively fixed. Record accepted corrections in normalized JSON and `review.md`, preserving
 IDs and speaker-span text consistency. No audio or diarization rerun is needed for
 a recap retry. New summary requests send transcript/context to OpenAI and incur
 text charges unless cached. Live prose quality and acoustic accuracy remain human

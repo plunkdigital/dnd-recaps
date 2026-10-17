@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Summary citation recovery
 
 2026-10-16: user reports the older summarizer failed after completed GPU diarization.

@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Local diarization
 
 Authorized 2026-10-16: add speaker separation to the GPU transcription workflow.

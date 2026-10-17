@@ -1,7 +1,6 @@
-"""Synthetic provider replies for the selection and story stages."""
+"""Synthetic complete responses for the single-request recap workflow."""
 
 import json
-import re
 
 
 def response(text):
@@ -9,12 +8,9 @@ def response(text):
         {"type": "output_text", "text": text}]}]}
 
 
-def summary_reply(final_text):
+def summary_reply(final_text, checks=None, previously=""):
     def reply(endpoint, body):
-        data = json.loads(body)
-        if "Campaign relevance extraction v1" in data["instructions"]:
-            ids = sorted(set(re.findall(r"\[(c\d+:s\d+)\]", data["input"])))
-            return response(json.dumps({"items": [{"source_ids": ids, "category": "campaign",
-                                                   "note": "Grounded campaign evidence."}]}))
-        return response(final_text)
+        return response(json.dumps({"recap_markdown": final_text,
+                                    "previously_markdown": previously,
+                                    "manual_checks": checks or []}))
     return reply

@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Recap quality and names
 
 Started 2026-10-16. Preserve audio, raw responses, stable IDs and human decisions.

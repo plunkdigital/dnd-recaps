@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Runner repair checklist
 
 Started 2026-10-17 after the [saved-output review](RUNNER_OUTPUT_REVIEW_2026-10-17.md).

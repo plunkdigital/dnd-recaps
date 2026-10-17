@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Scene decoding cutoff repair
 
 Started 2026-10-17. User run repaired all classifications, completed scene windows

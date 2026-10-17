@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Spoiler reference and recording intake
 
 Scope authorized 2026-10-16: add clearly labelled DM campaign context and inspect

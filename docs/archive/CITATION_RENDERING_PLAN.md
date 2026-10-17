@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Deterministic narrative citation rendering
 
 2026-10-16: cached partial-reduction responses still use citation ranges after

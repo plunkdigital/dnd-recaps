@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Relevance coverage recovery
 
 Follow-up: batch 4 has one source assigned across multiple groups, plus three

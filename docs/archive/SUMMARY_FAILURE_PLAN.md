@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Direct summary failure repair
 
 Started 2026-10-17. The latest direct Session 1 run withheld 1,980 segments and

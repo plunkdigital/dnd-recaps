@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Player campaign setup
 
 Accepted scope, 2026-10-16: establish player-facing Rime of the Frostmaiden context

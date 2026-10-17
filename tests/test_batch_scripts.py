@@ -98,7 +98,7 @@ fi
         self.assertTrue((run / "implementation.sha256").is_file())
 
     def test_implementation_change_stops_even_when_continue_on_error_is_set(self):
-        source = self.root / "src/dnd_recaps/narrative.py"
+        source = self.root / "src/dnd_recaps/recap.py"
         source.parent.mkdir(parents=True)
         source.write_text("# original implementation\n")
         result = self.run_batch(script="generate_recaps_gpu.sh", args=("--allow-cloud", "--summaries-only",

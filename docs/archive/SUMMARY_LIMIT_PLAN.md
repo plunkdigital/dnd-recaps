@@ -1,3 +1,5 @@
+> Historical implementation notes, archived 2026-10-17. See [current state](../PROJECT_STATE.md).
+
 # Bounded summary output recovery
 
 2026-10-16: all 74 Session 1 relevance batches completed; first narrative reduction
