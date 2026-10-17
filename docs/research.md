@@ -66,7 +66,7 @@ adding a tokenizer dependency or claiming an exact token count. Smaller overridd
 models may need a shorter recording. Oversized input is refused before upload.
 
 One Responses request uses `store: false`, `max_output_tokens: 8192` and a small
-strict object schema: current Markdown, prior-session Markdown, and review questions.
+strict object schema: current story blocks, prior-session blocks, and review questions.
 Strings have no prose regex, word-count limit or paragraph budget. Local code checks
 response completion, shape and source IDs; it does not grade storytelling by counts.
 Questions and prior evidence remain separate and never establish current events.
@@ -127,3 +127,20 @@ crops slice a tensor. Preloading is a plausible remedy for IO overhead; its real
 effect on GPU embedding throughput has not been measured. Synthetic tests confirmed
 identical sample crops with 100 decoder opens reduced to one. Keep TF32 disabled
 and model/overlap settings unchanged until there is evidence for a quality tradeoff.
+
+## Direct-response reference failure, 2026-10-17
+
+The first direct live response completed with valid JSON, but named three nonexistent
+source IDs. It was correctly withheld, while the generic malformed-response error
+obscured the cause. Rechecked the official
+[Structured Outputs constraints](https://developers.openai.com/api/docs/guides/structured-outputs#supported-schemas):
+integer minimum/maximum and array bounds are supported for the base model. The one
+request now returns Markdown blocks with source-number arrays bounded to supplied
+sources. Code appends original segment IDs. Questions use the same lookup; prior
+context uses a separate lookup. Canonical IDs remain in request text for cache binding.
+There is no string regex, prose quota, classification stage or automatic retry.
+Local checks still reject invalid types, out-of-range numbers, inline source markers
+and references to material withheld for manual review. These checks cannot establish
+that the cited utterance actually supports the prose. The invalid cached response
+is preserved and cannot be reused unchanged. Live behavior of the new format remains
+unverified; all six assembled requests fit the existing byte ceiling.

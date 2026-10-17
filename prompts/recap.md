@@ -20,7 +20,7 @@ Exclude unrelated table chatter from the tale, appendix, and proposed updates.
 Out-of-character campaign decisions, rulings, and corrections can still matter.
 If campaign relevance is unclear, withhold the material pending human review.
 Return these review questions separately in manual_checks, with neutral descriptions
-and exact source IDs. Do not turn questions into events or guess their answers.
+and supplied source numbers. Do not turn questions into events or guess their answers.
 The response JSON separates the current story, optional previous-session opening,
 and review questions; the story itself is Markdown.
 
@@ -36,12 +36,11 @@ Omit private asides, out-of-character personal information, and possible DM secr
 from the player recap; flag only that an audience review is needed, without quoting
 the secret. Every output is an unreviewed draft, not automatically spoiler-safe.
 
-Cite significant events with the exact provided [cNNNN:sNNNN] segment IDs. Do not create new IDs. Give combat outcomes
-and lasting effects rather than every roll. Include social and exploration scenes.
-Each ID needs its own square brackets: [c0000:s0001] [c0000:s0004]. These are format
-examples only; copy actual IDs from the supplied evidence. Never compress IDs into
-ranges, abbreviate chunk/segment prefixes, put multiple IDs in one bracket pair,
-or use bare IDs. Never guess a nearby ID when the needed evidence is absent.
+Associate significant events with their supplied source numbers in each block's
+sources array. Code renders those references as original segment IDs. Never put
+citation markers, source inventories or invented IDs in the prose. Give combat
+outcomes and lasting effects rather than every roll. Include social and exploration
+scenes. Source numbers must actually support the accompanying claims.
 For absent evidence say "Not established" rather than filling gaps.
 Overlapping chunks can repeat the same dialogue: narrate that event once while
 preserving its evidence references. Do not mistake repeated audio for repeated actions.
@@ -54,7 +53,7 @@ scenery, gestures, emotions, inner thoughts, causal explanations, dialogue, or s
 that the evidence does not establish. Indirect speech is preferable to invented
 quotes. Use metaphor and pacing to bring supported events to life. Do not force a
 heroic tone onto tragedy or turn an uncertain rumor into an omniscient revelation.
-Keep the narrative flowing; put source citations at paragraph ends. Include a short
+Keep the narrative flowing; code places each block's source citations at its end. Include a short
 reference appendix for bookkeeping and review, rather than interrupting the story
 with a series of crude reports. An evocative title must also be grounded in events.
 Aim for about 600–1000 words of story, shorter for sparse evidence.
@@ -81,5 +80,5 @@ End the tale at the actual stopping point; use a cliffhanger only if the session
 Keep the appendix compact, about 200 words total; omit empty categories. Do not
 repeat the story as lists. Develop the beginning, middle and ending of the session
 in proportion to their consequences. Do not replace scenes with generic statements
-about fellowship, destiny or the atmosphere. Use a few directly supporting citations at each narrative paragraph end; avoid
-source inventories. The number of citations and paragraph length are editorial choices.
+about fellowship, destiny or the atmosphere. Choose a few directly supporting sources for each narrative paragraph; avoid
+source inventories. The number of references and paragraph length are editorial choices.

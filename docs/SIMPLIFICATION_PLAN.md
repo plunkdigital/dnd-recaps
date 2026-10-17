@@ -20,7 +20,7 @@ separate manual questions, without a text-processing framework.
 | Reviewed speaker aliases and voice-match proposals | Keep: explicitly requested; never auto-approve |
 | Session-bounded spelling and reviewed predecessor | Keep: names and continuity without future events |
 | Per-source classification and legacy classification repair | Remove: dozens of requests before writing anything |
-| Scene note compression and numeric citation transport | Remove: discarded context and introduced formatting failures |
+| Scene compression and old citation transport | Removed; the live failure below requires a small bounded source lookup only |
 | Recursive splits and automatic prose rewrites | Remove: extra paid requests without demonstrated benefit |
 | Paragraph word/character quotas, forced coverage thirds | Remove: formatting proxies do not prove story quality |
 | Full response cache, source-ID checks, incomplete response rejection | Keep: concrete integrity checks |
@@ -43,3 +43,23 @@ below the ceiling. No audio stages, paid calls or secret loading were performed.
 
 Verification: 74 offline tests passed; shell syntax, safe CLI help, local documentation
 links and Git whitespace checks passed. Fresh API prose quality is unrun.
+
+## Direct-response reference repair, 2026-10-17
+
+The first live direct response completed with valid JSON but invented three source
+IDs: two in manual questions, one in the recap. Existing validation correctly refused
+publication, but incorrectly called the review response malformed.
+
+- [x] Use bounded numeric source references in the one response, rendered to original
+  IDs by code. Keep prose unconstrained and all original input available.
+- [x] Cover invalid references, source-map cache identity and prior-session isolation.
+- [x] Verify the saved failure, full offline suite, docs and whitespace; record live limits.
+
+This replaces model-typed compound IDs with a small source lookup. It does not restore
+classification, scene reduction, prose quotas or automatic recovery requests. The old
+response remains preserved; its nonexistent references cannot safely be guessed.
+
+Repair verification: 77 offline tests pass. All six assembled requests are
+245,657-660,444 bytes and have new cache identities. No paid request, protected
+credential loading, audio processing or modification of saved responses occurred.
+Live format behavior and claim support still need an operator run and human review.

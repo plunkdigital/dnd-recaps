@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from dnd_recaps import cli
+from dnd_recaps import cli, recap
 from summary_fixtures import summary_reply
 
 
@@ -182,7 +182,7 @@ class PipelineTests(unittest.TestCase):
             cli.summarize(self.root, self.dest, "test-model")
         self.assertEqual(api.call_count, 1)
         payload = json.loads(api.call_args.args[1])
-        self.assertEqual(payload["input"], cli.render(segments))
+        self.assertEqual(payload["input"], recap.number_sources(cli.render(segments), [s["id"] for s in segments]))
         self.assertEqual(payload["text"]["format"]["name"], "session_recap")
 
     def test_cloud_flag_is_required_before_api_use(self):

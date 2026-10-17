@@ -59,7 +59,7 @@ class RecapTests(unittest.TestCase):
         self.assertIn("20.00-24.00s", report)
         self.assertIn("not an exhaustive classification", report)
         self.assertNotIn("c0000:s0001", (self.out / "recap.draft.md").read_text())
-        self.assertEqual(cli.read_json(self.out / "provenance.json")["narrative_method"], "full_transcript_v1")
+        self.assertEqual(cli.read_json(self.out / "provenance.json")["narrative_method"], "full_transcript_v2")
 
     def test_unknown_or_withheld_or_malformed_citations_fail_without_retries(self):
         question = {"source_ids": ["c0000:s0001"], "topic": "Unclear", "question": "Campaign related?"}
@@ -129,6 +129,41 @@ class RecapTests(unittest.TestCase):
         with patch.object(cli, "api", side_effect=summary_reply(long)):
             self.run_summary()
         self.assertIn(long, (self.out / "recap.draft.md").read_text())
+
+    def test_source_numbers_use_exact_ids_even_with_gaps_and_different_chunks(self):
+        segments = [{"id": "c0003:s0025"}, {"id": "c0012:s0008"}]
+        data = {"recap_blocks": [{"markdown": "A supported outcome.", "sources": [2]}],
+                "previously_blocks": [], "manual_checks": [
+                    {"sources": [1], "topic": "Unclear", "question": "Campaign related?"}]}
+        story, _, questions = recap.parse(json.dumps(data), segments, "")
+        self.assertEqual(story, "A supported outcome. [c0012:s0008]")
+        self.assertEqual(questions[0]["source_ids"], ["c0003:s0025"])
+        for invalid in (0, 3, -1, True, "2", 1.5):
+            data["recap_blocks"][0]["sources"] = [invalid]
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, "Invalid source reference in recap block 1"):
+                recap.parse(json.dumps(data), segments, "")
+
+    def test_schema_bounds_references_and_disables_unavailable_previous_opening(self):
+        schema = recap.response_format(4623, 0)["schema"]["properties"]
+        for sources in (schema["recap_blocks"]["items"]["properties"]["sources"],
+                        schema["manual_checks"]["items"]["properties"]["sources"]):
+            self.assertEqual(sources["items"], {"type": "integer", "minimum": 1, "maximum": 4623})
+        self.assertEqual(schema["previously_blocks"]["maxItems"], 0)
+        self.assertEqual(schema["recap_blocks"]["items"]["properties"]["markdown"], {"type": "string"})
+
+    def test_mapping_changes_invalidate_cache_and_prior_numbers_are_separate(self):
+        first = recap.number_sources("Event [c0000:s0000]", ["c0000:s0000"])
+        second = recap.number_sources("Event [c0008:s0042]", ["c0008:s0042"])
+        self.assertIn("[1|", first)
+        self.assertIn("[1|", second)
+        self.assertNotEqual(cli.generation_request("Write", first, "fixture", self.out)[1],
+                            cli.generation_request("Write", second, "fixture", self.out)[1])
+        data = {"recap_blocks": [{"markdown": "Current event.", "sources": [1]}],
+                "previously_blocks": [{"markdown": "Prior event.", "sources": [1]}],
+                "manual_checks": []}
+        story, previous, _ = recap.parse(json.dumps(data), [{"id": "c0008:s0042"}], "Prior [c0000:s0000]")
+        self.assertIn("[c0008:s0042]", story)
+        self.assertIn("[c0000:s0000]", previous)
 
     def test_model_prompt_and_names_invalidate_the_request_cache(self):
         with patch.object(cli, "api", side_effect=summary_reply(STORY)) as api:

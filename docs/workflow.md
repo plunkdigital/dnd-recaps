@@ -63,10 +63,15 @@ This includes the separately authorized, spoiler-labelled tracked DM reference.
 The reference is stored for explicit DM-reference work only; it is not background
 context for player recap generation or media chronology.
 The complete transcript and permitted context go to one Responses request. There
-is no classification pass, intermediate scene outline, recursive reduction, numeric
-citation remapping or automatic rewrite. The response contains three fields:
-`recap_markdown`, `previously_markdown` and `manual_checks`. Code keeps prior evidence
-separate, qualifies its citations and writes the current story and review report.
+is no classification pass, intermediate scene outline, recursive reduction or
+automatic rewrite. The response contains `recap_blocks`, `previously_blocks` and
+`manual_checks`. Blocks contain unrestricted Markdown and numeric `sources` arrays.
+Each input source is marked `[number|original ID]`; the response schema bounds
+numbers to the actual source count. Code resolves them to the original IDs. Manual
+questions use the same current-session numbers. Prior blocks have a separate lookup
+from the reviewed predecessor and are disabled when no predecessor exists. The
+original IDs stay in request text, binding the lookup to cache identity. Code keeps
+prior evidence separate, qualifies its citations and writes the story and review report.
 The model selects campaign material while writing, ignoring unrelated chatter and
 withholding ambiguous topics for manual review. This does not classify every segment
 or guarantee that every ambiguity, unsupported claim or spoiler was detected.
@@ -136,7 +141,7 @@ recap. A session `manual-check.md` index is created only if absent; it and `revi
 remain human-owned. Keep decisions, reviewer/date and corrections there. Draft
 reports are replaced on rerun and never applied automatically to campaign state.
 No reported questions means only that the model reported none, not a completed
-human review. The JSON records `method: full_transcript_v1` and pending human review,
+human review. The JSON records `method: full_transcript_v2` and pending human review,
 without claiming complete source classification.
 
 ### Response validation and recovery
@@ -145,12 +150,11 @@ Only completed, non-refused responses with valid JSON and known citations can
 publish new drafts. Current-story IDs must belong to this recording and cannot be
 flagged for manual review. Previously IDs must come from the reviewed predecessor;
 code qualifies them by session and links to that reviewed file. Uncertain topics
-are not narrative evidence. An empty story field produces a plain no-established-
-events account. No word-count rejection or automatic paid retry occurs.
+are not narrative evidence. An empty current-story block array produces a plain no-established-events account. No word-count rejection or automatic paid retry occurs.
 
 Raw responses are preserved under the existing content-addressed `cache/`; incomplete
 or refused responses are diagnostic files under `cache/incomplete/`. Validation
-failures preserve responses and stop without publishing new drafts. Identical
+failures identify the affected block or review question, preserve responses and stop without publishing new drafts. Identical
 requests reuse cached failures as well as successes, so rerunning unchanged input
 cannot repair a bad response. Inspect the diagnostic and correct the prompt, input
 or model as appropriate; those changes create a different request identity.

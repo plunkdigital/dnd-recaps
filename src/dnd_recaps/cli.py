@@ -307,7 +307,7 @@ def summarize(root, dest, model, backend="openai"):
                     "Uncertain phonetic matches require review, not silent transcript replacement.")
     previous, previous_path = campaign.previous_recap(root, dest, metadata_object, backend)
     if previous:
-        context += "\nReviewed previous session, prior history only; never current-session evidence:\n" + previous
+        context += "\nReviewed previous session, prior history only; separately numbered sources:\n" + recap.number_sources(previous, sorted(recap.citations(previous)))
     instructions = prompt + "\nCampaign reference data (not session evidence):\n" + context + "\nSession metadata:\n" + metadata
     if backend == "cuda":
         instructions += "\nThis transcript has no speaker diarization. All speakers are unknown; do not infer identities from acoustic labels."
@@ -316,13 +316,15 @@ def summarize(root, dest, model, backend="openai"):
         instructions += "\nOnly the active reviewed speaker_map applies. speaker_map_history records superseded corrections, not additional identities. Voice-match proposals are not approved identity evidence."
     cache = summary_dir / "cache"
     instructions += recap.TASK
+    text = recap.number_sources(text, [s["id"] for s in transcript["segments"]])
+    response_format = recap.response_format(len(transcript["segments"]), len(recap.citations(previous)))
     # The complete transcript is sent, with no model-generated selection or compression.
-    request_body, _, _ = generation_request(instructions, text, model, cache, recap.RESPONSE_FORMAT)
+    request_body, _, _ = generation_request(instructions, text, model, cache, response_format)
     if len(request_body) > MAX_SUMMARY_INPUT_BYTES:
         raise ValueError("Complete recap input exceeds 750,000 UTF-8 bytes. Split the recording "
                          "explicitly before summarizing; no evidence was truncated or uploaded.")
     print("Generating story and review questions from the full transcript...", flush=True)
-    output = generate(instructions, text, model, cache, recap.RESPONSE_FORMAT)
+    output = generate(instructions, text, model, cache, response_format)
     story, opening, checks = recap.parse(output, transcript["segments"], previous)
     if opening:
         link = os.path.relpath(root / previous_path, summary_dir)
@@ -338,7 +340,7 @@ def summarize(root, dest, model, backend="openai"):
                    "preceding session. Previously was omitted. Review that session before regenerating "
                    "with its continuity.\n")
     report_hash = recap.publish_checks(dest, summary_dir, report, {
-        "schema_version": 2, "method": "full_transcript_v1", "human_review_status": "pending",
+        "schema_version": 2, "method": "full_transcript_v2", "human_review_status": "pending",
         "transcription_backend": backend, "transcript_sha256": transcript_hash,
         "checks": checks,
     })
@@ -349,7 +351,7 @@ def summarize(root, dest, model, backend="openai"):
         "reviewed_speaker_map": transcript.get("reviewed_speaker_map", {}),
         "prompt_sha256": digest(root / "prompts/recap.md"),
         "context_sha256": hashlib.sha256((context + metadata).encode()).hexdigest(),
-        "review_status": "unreviewed", "narrative_method": "full_transcript_v1",
+        "review_status": "unreviewed", "narrative_method": "full_transcript_v2",
         "previous_reviewed_recap": previous_path,
         "previous_reviewed_sha256": digest(root / previous_path) if previous_path else None,
         "name_reference": spelling,
