@@ -1,31 +1,34 @@
 # Current project state
 
-Updated 2026-10-17. Campaign canon remains in `context/campaign/state.md`.
+Updated 2026-10-19. Campaign canon remains in `context/campaign/state.md`.
+See the [completed checklist](SIMPLIFICATION_PLAN.md) for implementation and audits.
 
-Live generation and transcript review are complete for Sessions 1 through 6 under
-the user's runtime authorization. See the [completed checklist](SIMPLIFICATION_PLAN.md).
-Each session has `summaries/cuda-diarized/recap.draft.md`, separate manual-check
-Markdown/JSON, provenance, preserved raw responses and `quality-review.codex.md`.
-All remain unreviewed drafts; no human approval or campaign update was applied.
+Current phase: the editable answer workbook is ready at
+`recordings/catalog/reviews/2026-10-19/Icewind-Dale-Open-Questions-Sessions-01-to-06.xlsx`.
+Questions contains all 54 pending questions from Sessions 1-6. The user edits column
+E (Your answer), optionally F (Notes). Blank means unanswered; `n/a` means unknown
+or not remembered, never approval, a negative answer or a resolved fact. Partial
+answers can mark remaining subparts `n/a`. Sources retains IDs, timestamps and hashes.
+Match returned answers by Question ID, not row position; the adjacent manifest holds
+the original snapshot. Never regenerate over the user's answer workbook.
 
-GPT-6 Astra with medium reasoning passed the live comparisons. Earlier mini and
-GPT-5.4 results failed specific identity, coverage or evidence checks and remain
-preserved. The final stories are about 920-1,100 words with compact appendices and
-paragraph evidence footnotes. All 122 cited sections were checked against transcript
-passages. The 54 manual questions still require human decisions, especially audience
-scope for Session 2's character-specific clue and other mixed-audience material.
+Workbook checks passed: exact question/source preservation, 54 unique IDs, blank
+editable answers, package/XML integrity and synthetic answer/n/a/blank round trips.
+Original reports and human logs are unchanged. No pipeline behavior changed, so the
+pipeline suite was not rerun. Visual Excel rendering and Google Sheets import are
+unrun. No cloud upload, provider request, recap approval or canon update occurred.
+
+Six generated stories, 54 manual questions and private source audits remain under
+each session's `summaries/cuda-diarized/`. The last pipeline verification passed
+87 tests and checked 122 cited sections, cache reuse and all 69 audio hashes.
 No reviewed predecessors exist; Sessions 2-6 omit Previously and report that gap.
 
-87 offline tests pass. All six cache-only CLI reruns made zero API calls and
-reproduced identical artifacts; request words/IDs and provenance hashes passed.
-All 69 original/chunk audio files match manifest hashes. Pre-run preservation
-snapshots remain unchanged. Shell syntax, safe CLI help, local documentation links
-and Git whitespace checks pass. No new GPU inference or source-audio listening was
-performed. Secret contents were not inspected; no commit, push or publishing occurred.
+Individual Word copies, their ZIP and `Icewind-Dale-Sessions-01-to-06-Master.docx`
+are in `recordings/catalog/exports/2026-10-17/`. All 274 master paragraphs and 122
+citation groups were verified. Session 2's character-specific clue remains omitted
+only from party exports; answering its audience question `n/a` preserves that omission.
 
-The CLI fallback is `gpt-6-astra`; existing configuration still wins. The verified
-batch log and machine audit are under
-`recordings/catalog/batch-runs/gpu-20261017T092449Z-NTOJF9/`.
-Next: human review of each draft and its questions. To rerun the current inputs:
-`./scripts/generate_recaps_gpu.sh --allow-cloud --summaries-only --through-session 6 --model gpt-6-astra`.
-Approved predecessor recaps will intentionally invalidate later summary caches.
+Next: the user fills the workbook and saves it locally or supplies the edited XLSX.
+Remote edits are not automatically synchronized. Read supplied answers as human
+review input and retain unknowns; do not infer missing details or silently approve
+recaps or campaign updates. No new source-audio or GPU verification was performed.

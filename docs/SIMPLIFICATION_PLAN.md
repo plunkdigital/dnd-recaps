@@ -179,3 +179,74 @@ an audience decision on a character-specific clue already in its appendix. Human
 review, including mixed-audience material and approval, remains separate from these
 checks. No human decision logs or campaign canon were changed; no commit or push
 was made.
+
+## Word exports for party review, 2026-10-17
+
+The user requested DOCX copies of all six drafts and asked for only essential
+pre-export questions. Most historical uncertainties can remain unresolved.
+
+- [x] Review all 54 questions for blocking factual or audience issues. Defer optional
+  bookkeeping, spelling and mechanics questions without guessing their answers.
+- [x] Export six party-facing Word documents with story, compact appendix and evidence.
+  Omit the Session 2 character-specific clue from the export because its audience
+  scope is unconfirmed; retain the original draft and review question unchanged.
+- [x] Check document structure, text/citation preservation, package integrity and
+  the download bundle. Keep technical review notes outside the party documents.
+- [x] Record output locations, omissions and verification in project state. Preserve
+  human-owned logs, draft provenance and all original generated artifacts.
+
+No cloud generation, Google Drive upload, human approval or campaign-state update
+is part of this export. Formatting tools are isolated under `/tmp`, outside the
+project's runtime dependencies. Audience review remains a human responsibility;
+the conservative omission removes the known unresolved clue from the party copies.
+
+Output: `recordings/catalog/exports/2026-10-17/Session-01-Recap.docx` through
+`Session-06-Recap.docx`, plus `Sessions-01-to-06-Recaps.zip` containing only those six
+Word documents. `export-review.md` links the unchanged manual reports for later;
+`export-manifest.json` records input/output hashes and the exact export-only omission.
+
+All six packages passed ZIP/XML integrity, python-docx reopening, exact paragraph
+text, citation-occurrence and reference-format checks. Original session files stayed
+unchanged. Word pagination and Google Docs import were not visually tested. No
+pipeline code or project dependencies changed, so the offline suite was not rerun.
+
+
+The user subsequently requested one master Word file. Created
+`Icewind-Dale-Sessions-01-to-06-Master.docx` from the six verified DOCX exports in
+session order, preserving the Session 2 omission and starting each recap on a new
+page. Verified all 274 paragraphs in exact order, 122 citation groups, list numbering,
+unique bookmarks, page breaks, package integrity and unchanged input hashes.
+`master-manifest.json` records the checks. Visual pagination and Google Docs import
+remain unrun. No pipeline code changed.
+
+
+## Answer workbook, 2026-10-19
+
+The user requested one editable spreadsheet covering all open questions across
+Sessions 1-6. They will answer what they remember and use literal `n/a` otherwise.
+
+- [x] Read current question reports and human logs; identify all 54 pending questions.
+- [x] Create one XLSX workbook with editable answers, stable row IDs and retained
+  source references. Keep the answer grid separate from detailed provenance.
+- [x] Reopen and verify all questions, references, editable cells and `n/a` round-trip
+  behavior. Preserve every source report and avoid overwriting existing answers.
+- [x] Record the workbook location and how subsequent answers should be read.
+
+Blank means unanswered. `n/a` means unknown/not remembered, never approval, denial,
+a resolved fact or a correction. Partial answers may leave subparts `n/a`.
+No automatic campaign edits, cloud upload or generation is part of this work.
+
+Workbook: `recordings/catalog/reviews/2026-10-19/Icewind-Dale-Open-Questions-Sessions-01-to-06.xlsx`.
+The Questions tab has 54 rows, stable snapshot IDs, blank text-formatted answer
+cells in column E and optional notes in F. Read me explains returning an edited
+copy. Sources preserves question fingerprints, original report paths/hashes,
+transcript hashes, source IDs and recording timestamps. A separate ignored manifest
+keeps the snapshot mapping so future answers can be matched by ID after sorting.
+
+Verified all 54 exact questions and source references, per-session counts, editable
+blank answers, ZIP/XML integrity and a synthetic edit/read round trip in a temporary
+copy. Literal `n/a` remains text, partial answers remain intact and blanks remain
+blank. Original reports and human logs are unchanged. Visual Excel rendering and
+Google Sheets import are unrun. No pipeline code changed; its suite was not rerun.
+The workbook generator refuses to overwrite an existing file, preserving future
+answers. Read future answers as human review input, not automatic canon changes.
